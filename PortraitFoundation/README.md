@@ -8,9 +8,13 @@ Sources/PortraitCore/
   RetouchOp.swift     文档模型、算子、锚点、校验、渲染契约
 Tests/PortraitCoreTests/
   RetouchOpTests.swift
+Sources/RetouchKit/
+  SkinRenderer.swift  版本化 CPU 磨皮参考实现
+Tests/RetouchKitTests/
+  SkinRendererTests.swift
 ```
 
-已验证：Swift 6 语言模式（严格并发）下 `swiftc -typecheck` 无警告；9 组运行时行为全部通过。
+已验证：Swift 6 严格并发下构建通过，数据模型 16 个测试和磨皮渲染 10 个测试全部通过；两个库均通过 iOS arm64 编译。
 
 ---
 
@@ -144,30 +148,29 @@ Compositor 里有两套完整合成器（Core Graphics 一套、Core Image 一�
 
 ## 验证方式
 
-SwiftPM 在本机的 DSH 沙箱里跑不起来（`sandbox-exec: sandbox_apply: Operation not permitted`）。已验证的替代路径：
-
 ```sh
-SDK=$(xcrun --show-sdk-path --sdk macosx)
-
-# 1. 库本身（Swift 6 严格并发）
-swiftc -typecheck -sdk "$SDK" -target arm64-apple-macos15.0 -swift-version 6 \
-  -module-cache-path ./.cache/modules \
-  Sources/PortraitCore/JSONValue.swift Sources/PortraitCore/RetouchOp.swift
-
-# 2. 测试文件
-FW=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks
-PLUGINS=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing
-swiftc -typecheck -enable-testing -sdk "$SDK" -target arm64-apple-macos15.0 -swift-version 6 \
-  -module-cache-path ./.cache/modules -I ./.cache -F "$FW" -plugin-path "$PLUGINS" \
-  Tests/PortraitCoreTests/RetouchOpTests.swift
+swift test
+swift build --triple arm64-apple-ios18.0 \
+  --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+  --scratch-path /tmp/portrait-ios-build
 ```
 
-在正常环境里直接 `swift test` 即可。
+CI 已加入包测试及 iOS 编译。受限沙箱的替代验证方式见 `AGENTS.md`。
+
+## 已实现：skin 与渲染契约
+
+`RetouchKit.SkinRenderer` 实现 `skin` 的两版算法；新文档用 `processVersion = 2`，
+旧版和缺失版本字段的文档继续用 1。整栈绑定文档版本，单步通过 `RenderContext`
+接收版本。两个版本的输出有固定回归指纹，整栈与独立逐步折叠的像素差为 0。
+
+支持显式皮肤遮罩、纹理保留、透明度、遮罩扩张和预览半径缩放。尚无自动皮肤检测，
+非零 `blemishStrength` 和其他已知算子明确报错。合成纹理样本的结果及内存限制见
+[渲染器说明](Sources/RetouchKit/README.md)；尚未用真实人像验证效果。
 
 ---
 
 ## 还没做、但下一步该做的
 
-- **`retouch-kit`**：`RetouchRenderer` 的第一个实现。`tone` / `presence` / `toneCurve` / `skin` 四条，够验证契约和折叠一致性测试。
-- **`MCP-TOOLS.md`** 里那张工具表：进程内 MCP server，先只暴露 `analyze_faces` / `suggest_retouch` / `render_preview` 三个，验证「看图 → 提议 → 确认 → 应用 → 再看图」闭环。
+- **渲染器扩展与实片验证**：`skin` 参考实现已完成，后续加入检测、祛瑕疵及 `tone` / `presence` / `toneCurve`，校准真实人像效果与性能。
+- **`MCP-TOOLS.md`** 里那张工具表：进程内 MCP server，先只暴露 `analyze_faces` / `render_preview_with` / `set_stack` 三个，验证「看图 → 提议 → 确认 → 应用 → 再看图」闭环。
 - **`SKILL-portrait-retouch.md`**：把修图方法论从代码里拿出来。这是护城河，而且改它不用发版。

@@ -1,6 +1,6 @@
 # Notes for AI agents — PortraitFoundation
 
-这是**一个人像修图 App 的地基**：跨平台（Mac / iPad / iPhone）的声明式修饰模型。目前**只有数据模型，没有任何渲染实现、没有 UI、没有 App**。
+这是**一个人像修图 App 的地基**：跨平台（Mac / iPad / iPhone）的声明式修饰模型。目前已有**数据模型与 `RetouchKit.SkinRenderer` 的版本化 CPU 参考实现，没有 UI、没有 App**。
 
 现在它住在 Compositor 仓库的一个子目录里，将来会拆成独立仓库。**把它当成独立项目对待**：里面的东西不该依赖 Compositor，也不该反向影响它。
 
@@ -157,6 +157,11 @@ Sources/PortraitCore/
   RetouchOp.swift     文档模型、算子、锚点、校验、渲染契约
 Tests/PortraitCoreTests/
   RetouchOpTests.swift
+Sources/RetouchKit/
+  SkinRenderer.swift  版本化 CPU 磨皮参考实现
+  README.md           使用方式、验收指标与已知限制
+Tests/RetouchKitTests/
+  SkinRendererTests.swift
 README.md             五条规则 + 关键类型速览 + 验证方式
 MCP-TOOLS.md          AI 控制层设计（工具面、schema、视觉闭环、三端拓扑）
 SKILL-portrait-retouch.md   修图方法论 —— 这是产品 know-how，不是代码
@@ -166,8 +171,7 @@ SKILL-portrait-retouch.md   修图方法论 —— 这是产品 know-how，不�
 
 ## 还没做（下一步的依赖顺序，不要并行）
 
-1. **`retouch-kit`** — `RetouchRenderer` 的第一个实现。先只做 `tone` / `presence` / `toneCurve` / `skin` 四条，够验证契约和折叠一致性测试。
-   **`skin` 是最难写对也最能验证设计的一个**：如果"意图 vs 算法"这条规则撑不住，在它身上会第一个暴露。
+1. **渲染器实片验证与扩展** — `skin` 的两版参考实现和零容差一致性测试已完成。先验证真实人像、检测遮罩与性能，再扩展 `tone` / `presence` / `toneCurve`。实现限制见 `Sources/RetouchKit/README.md`。
 2. **进程内 MCP server，只暴露 3 个工具** — `analyze_faces` / `render_preview_with` / `set_stack`。跑通「AI 看图 → 提议 → 人确认 → 应用 → 再看图」就够验证架构。
 3. **用真实片子校准 `SKILL-portrait-retouch.md`** — 里面那张强度表是起点不是答案。
 

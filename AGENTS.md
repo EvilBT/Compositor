@@ -2,6 +2,11 @@
 
 Compositor is a macOS image editor for compositing and photo work, written in Swift (SwiftUI and AppKit, with some C for pixel work).
 
+## Project status
+
+- Before starting work, read [STATUS.md](STATUS.md) for current progress, known issues, and next steps. Check its claims against the code when relevant.
+- Before finishing, update `STATUS.md` with actual progress, validation results, remaining issues, and next steps. Keep completed work distinct from plans and unverified claims.
+
 ## Designing or editing a Compositor project
 
 If you've been asked to make or change an image in a `.comp` project, you don't need the app's source code. Read [docs/writing-comp-files.md](docs/writing-comp-files.md): it covers the file format, the rules that make a project load, and how to write it safely while it's open, so the person can watch the canvas update as you work.

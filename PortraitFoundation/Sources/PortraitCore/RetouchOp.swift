@@ -53,7 +53,7 @@ public struct PortraitDocument: Codable, Sendable, Equatable {
     /// Bumped when the *meaning* of an existing op changes, the way Lightroom's Process
     /// Version is. Old documents keep rendering the way they did; only new edits get the
     /// new behaviour. This is the escape valve that makes rule 1 safe.
-    public static let currentProcessVersion = 1
+    public static let currentProcessVersion = 2
 
     public var format: String = PortraitDocument.formatID
     public var version: Int = PortraitDocument.currentVersion
@@ -90,7 +90,8 @@ public struct PortraitDocument: Codable, Sendable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         format = try c.decodeIfPresent(String.self, forKey: .format) ?? Self.formatID
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? Self.currentVersion
-        processVersion = try c.decodeIfPresent(Int.self, forKey: .processVersion) ?? Self.currentProcessVersion
+        // Missing versions belong to the original semantics, never a newer default.
+        processVersion = try c.decodeIfPresent(Int.self, forKey: .processVersion) ?? 1
         photo = try c.decode(PhotoReference.self, forKey: .photo)
         ops = try c.decodeIfPresent([RetouchOp].self, forKey: .ops) ?? []
         faces = try c.decodeIfPresent([FaceAnalysis].self, forKey: .faces)
@@ -1171,6 +1172,14 @@ public struct RenderContext: @unchecked Sendable {
         case preview(maxDimension: Int)
     }
 
+    /// Single-step rendering uses this version; a stack binds it to the document version.
+    public let processVersion: Int
+    /// Full-resolution dimensions used to scale spatial parameters in preview inputs.
+    /// Preview inputs are already resized by the caller, with the same aspect ratio.
+    public let sourcePixelSize: SIMD2<Int>?
+    /// Explicit skin coverage, black = protected, white = editable. Same dimensions and
+    /// top-left orientation as the input. A detector supplies it; a face box is not a mask.
+    public let skinMask: CGImage?
     public let scale: Scale
     public let assets: [UUID: CGImage]
     public let faces: [FaceAnalysis]
@@ -1181,11 +1190,22 @@ public struct RenderContext: @unchecked Sendable {
         case draft, standard, best
     }
 
-    public init(scale: Scale, assets: [UUID: CGImage], faces: [FaceAnalysis], quality: Quality = .standard) {
+    public init(scale: Scale, assets: [UUID: CGImage], faces: [FaceAnalysis], quality: Quality = .standard,
+                processVersion: Int = PortraitDocument.currentProcessVersion,
+                sourcePixelSize: SIMD2<Int>? = nil, skinMask: CGImage? = nil) {
+        self.processVersion = processVersion
+        self.sourcePixelSize = sourcePixelSize
+        self.skinMask = skinMask
         self.scale = scale
         self.assets = assets
         self.faces = faces
         self.quality = quality
+    }
+
+    /// Keep the same analysis, assets and preview geometry while selecting saved semantics.
+    public func usingProcessVersion(_ version: Int) -> RenderContext {
+        RenderContext(scale: scale, assets: assets, faces: faces, quality: quality,
+                      processVersion: version, sourcePixelSize: sourcePixelSize, skinMask: skinMask)
     }
 }
 
@@ -1225,6 +1245,7 @@ public extension RetouchRenderer {
     /// conforming renderer can inherit this, and should, until it has a reason and a test
     /// to do otherwise.
     func foldStack(_ document: PortraitDocument, input: CGImage, context: RenderContext) throws -> CGImage {
+        let context = context.usingProcessVersion(document.processVersion)
         var image = input
         for op in document.renderOrder {
             image = try renderStep(op.kind, input: image, context: context)

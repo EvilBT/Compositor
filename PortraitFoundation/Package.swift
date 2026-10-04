@@ -12,9 +12,12 @@ let package = Package(
     platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
         .library(name: "PortraitCore", targets: ["PortraitCore"]),
+        .library(name: "RetouchKit", targets: ["RetouchKit"]),
     ],
     targets: [
         .target(name: "PortraitCore"),
+        .target(name: "RetouchKit", dependencies: ["PortraitCore"], exclude: ["README.md"]),
+        .testTarget(name: "RetouchKitTests", dependencies: ["RetouchKit", "PortraitCore"]),
         .testTarget(name: "PortraitCoreTests", dependencies: ["PortraitCore"]),
     ]
 )

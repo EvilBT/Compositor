@@ -2,7 +2,9 @@
 
 > 工作文档。每次开工先看这里，收工前更新这里。
 >
-> 最后更新：`b8d2d0b`
+> 最后更新：2026-10-05（基于 `b0cd3da` 的工作区更新）
+
+本次更新：完成 `RetouchKit.SkinRenderer` 的两版 CPU 参考实现与零容差渲染契约验证。Debug / Release 测试：模型 16 项、渲染 10 项全部通过；固定像素指纹在两种构建下相同；iOS arm64 编译通过。已加入 CI，尚未在远端运行。根目录 `AGENTS.md` 已加入开工先读、收工更新本文件的约定。改动尚未提交。
 
 ---
 
@@ -12,7 +14,7 @@
 
 **起点**：fork 了 [Compositor](https://github.com/robbietilton/Compositor)（MIT，macOS 图像编辑器，36k 行 Swift + C）作为像素引擎的参照与来源。
 
-**当前状态一句话**：**地基和工具链都验证过了，应用本身一行代码还没写。**
+**当前状态一句话**：**数据模型、工具链和首个磨皮参考渲染器已验证；新应用 UI 尚未开始。**
 
 ---
 
@@ -38,10 +40,10 @@
 |---|---|---|
 | 环境搭建与验证 | ✅ 完成 | 能构建、能跑、能测、能操作 |
 | **国际化（中文）** | ✅ 完成 | **773 / 774** |
-| **PortraitFoundation 数据模型** | ✅ 完成 | 2483 行，16 测试全绿 |
+| **PortraitFoundation 数据模型** | ✅ 完成 | 1332 行，16 测试全绿 |
 | i18n 工具链 | ✅ 完成 | `scripts/i18n/` |
 | **CompositorKit 抽取** | ❌ 未开始 | Phase 0 的核心动作 |
-| **RetouchRenderer 实现** | ❌ 未开始 | 只有协议，零实现 |
+| **RetouchRenderer 实现** | 🟡 首个实现完成 | `skin` 两版 CPU 参考实现；其余算子、实片效果和性能待验证 |
 | **新 App（UI/外壳）** | ❌ 未开始 | 一行都没有 |
 | MCP server | ❌ 未开始 | 设计与工具清单已定 |
 | 人脸检测 / 压感 | ❌ 未开始 | 人像软件的两大门槛 |
@@ -57,10 +59,10 @@ origin    https://github.com/EvilBT/Compositor.git        ← 你的 fork
 upstream  https://github.com/robbietilton/Compositor.git  ← 原作者，保留参照
 
 main                 11d8d7a  ← 上游，从未改动
-portrait-foundation  b8d2d0b  ← 全部工作，已推送
+portrait-foundation  b0cd3da  ← 已提交基线；本次 skin 改动尚未提交
 ```
 
-53 个文件改动，+12579 / −127 行。
+`b0cd3da` 相对 `main`：54 个文件改动，+12835 / −127 行；不含本次工作区改动。
 
 ### 4.2 国际化（`6715f0b` `515ec86` `b8d2d0b`）
 
@@ -89,7 +91,7 @@ portrait-foundation  b8d2d0b  ← 全部工作，已推送
 
 ### 4.3 PortraitFoundation（`7c70167`）
 
-跨平台人像修图的**声明式修饰模型**。`Sources/PortraitCore/`，2483 行。
+跨平台人像修图的**声明式修饰模型**。`Sources/PortraitCore/`，当前 1332 行。
 
 - `PortraitDocument` / `RetouchOp` / **21 种算子** / `AnchoredPoint` 锚点 / 校验 / 渲染契约
 - **16 个测试全绿**（前向兼容往返、相位排序、Agent 归属、校验、同步元数据）
@@ -118,6 +120,64 @@ portrait-foundation  b8d2d0b  ← 全部工作，已推送
 | `PortraitFoundation/SKILL-portrait-retouch.md` | 修图方法论模板（**待用真实片子校准**） |
 | `scripts/i18n/README.md` | 国际化的全部踩坑与流水线 |
 
+### 4.6 skin 参考渲染器（本次工作区改动）
+
+- 新增独立 `RetouchKit` 库，不依赖 Compositor UI；只实现 `skin`。
+- `processVersion` 1 为基础频率重建，2 增强纹理保留并限制结构边缘的低频改动。新文档默认 2，缺失版本字段永久回退到 1。
+- 整栈绑定文档版本；独立单步折叠使用同版 context，输出逐字节一致，容差 0。两个版本均有固定图片输出指纹守护。
+- 显式皮肤遮罩、遮罩扩张/收缩、透明度保护、零强度、预览半径缩放和错误处理已验证。纹理全保留时仍能改善低频明暗不均。
+- 无检测结果且无遮罩时保护模式保持原图；已有人脸却无遮罩时报错，不把人脸框冒充皮肤区域。
+- 当前合成纹理样本：texture 0.85 时 v1 保留 72.73%、v2 保留 85.25%；texture 0.10 时分别 1.23%、10.17%，均通过 ≥60% / ≤25% 阈值。
+- 新增 10 个渲染测试（其中 3 个各测两版），加原模型 16 项全部通过。macOS Debug / Release 测试与 iOS arm64 编译通过；CI 已配置 Debug 测试及 iOS 编译，远端结果未验证。
+- 限制：RGBA8、编码 sRGB 的 CPU 参考路径，默认最多 16MP。自动皮肤/瑕疵检测未实现，非零 `blemishStrength` 及其他已知算子明确报错。真实人像、跨设备像素一致性与大图性能待验证。
+
+### 4.7 对 4.6 的独立复核（本次会话，实测）
+
+4.6 是作者自己的总结。以下是我逐条验证后的结果。
+
+**验证通过**（不是转述，是实际跑过）：
+
+| 声明 | 验证方式 | 结果 |
+|---|---|---|
+| 26 个测试全过 | `swift test` + `swift test -c release` | ✅ Debug 与 Release 都过 |
+| 指纹在两种配置下一致 | 上面两次运行 | ✅ 浮点确定性成立 |
+| iOS 能编译 | `swift build --triple arm64-apple-ios18.0` | ✅ 3.9 秒 |
+| 像素路径不含平台 UI | `grep -rn 'import AppKit\|UIKit\|Cocoa' Sources/` | ✅ 零命中 |
+| 整栈绑定文档版本 | 读 `SkinRendererTests.stackParity` | ✅ 它故意传**错误的** context 版本再断言相等 |
+| 缺失 `processVersion` 走 v1 | 读 `versionSemantics` + 跑 | ✅ 而且**它修掉了我写的一个真 bug**，见下 |
+| 算法在真实图像上有效 | 用测试人像跑 v1/v2 × texture 0.85/0.10/0，读图 | ✅ 见下 |
+
+**它修掉了我写的一个真 bug。** 我原来的解码器是：
+
+```swift
+processVersion = try c.decodeIfPresent(Int.self, forKey: .processVersion)
+                 ?? Self.currentProcessVersion     // ← 错
+```
+
+`currentProcessVersion` 一旦升到 2，**所有不含该字段的旧文档都会静默改用 v2 渲染**——外观全变，而这正是规则 1 存在的意义。正确写法是 `?? 1`（缺失即原始语义，永久）。这是规则 1 的反面教材被我写进了代码，他们抓到了。
+
+**首次真实图像验证**（1200×1600 合成人像，含毛孔与瑕疵）：
+
+- `texturePreservation = 0.85`：毛孔保留良好、色块均匀 → 可用
+- 降到 `0.10` / `0`：逐步趋近塑料，瑕疵变成软团
+- v2 在同一设置下保留比 v1 多（`sqrt` 设计如此）
+- **结论：算法是对的。**
+
+**真实性能，以及一个我自己踩的坑**：
+
+| | Debug | Release |
+|---|---:|---:|
+| 原始 `box` | 18,695 ms | **503 ms** |
+| 修改后 `box` | 5,058 ms | **372 ms** |
+
+我最初报出的是 **Debug** 数字（18.7 秒），**那是错的**——`swift build` 默认 `-Onone`。真实值是 **503 ms / 1.9 MP**，外推 12MP ≈ 3.2 秒、24MP ≈ 6.3 秒；预览路径先缩到 ~2048px，约 160 ms，可用于实时预览。
+
+顺带查明：`box(_:)` 里的**捕获式局部函数 `index()` 阻止了泛型特化**，`Range<Int>` 迭代因此退化为 `Collection._failEarlyRangeCheck` → `_swift_getGenericMetadata`，**每次迭代查一次元数据缓存**。我用不安全缓冲 + `while` 循环重写，**算术逐位不变**（指纹测试证明），Release 1.35×、Debug 3.7×（后者让测试套件从 1.6 s 降到 0.45 s）。改动在 `Sources/RetouchKit/SkinRenderer.swift`，注释里记了实测数字。
+
+**4.6 没有提到、但更重要的一条**：
+
+`renderStep` 对 `skin` 以外的任何算子都抛 `unsupportedOperation`，而 `renderStack` 折叠**全部**启用算子。所以**一个含 `tone` 的真实文档根本渲染不出来**——不是磨皮效果差，是整条栈直接报错。这是当前最大的实用性障碍。
+
 ---
 
 ## 五、未完成
@@ -126,8 +186,8 @@ portrait-foundation  b8d2d0b  ← 全部工作，已推送
 
 | # | 事项 | 为什么阻塞 |
 |---|---|---|
-| 1 | **抽取 `CompositorKit`** | 新 App 不能依赖 Compositor 的 UI 层。画笔引擎/光栅/降采样/C 内核都要抽出来 |
-| 2 | **实现 `RetouchRenderer`** | 目前只有一个协议。没有它就没有任何修图能力 |
+| 1 | **按需抽取 `CompositorKit`** | 画笔等旧引擎能力需要与 UI 分离；独立 skin 参考实现不依赖这一步 |
+| 2 | **完善渲染与皮肤检测** | skin 参考实现已存在，但自动遮罩、祛瑕疵、其他算子及大图性能尚未落地 |
 | 3 | **新 App 外壳** | 没有 UI，什么都看不到 |
 
 ### 5.2 功能性的（按人像工作流排序）
@@ -169,31 +229,41 @@ portrait-foundation  b8d2d0b  ← 全部工作，已推送
 
 ### 建议顺序（有依赖关系，别并行）
 
-**第 1 步：`skin` 算子 + 渲染契约验证** ← **建议从这里开始**
+**第 1 步：让 `skin` 真正可用 —— 皮肤遮罩 + 补齐算子** ← **从这里开始**
 
-理由：它是**唯一能一次性验证三件事**的地方，而且验收标准已经量化好了。
+4.6 的参考实现是对的，但**它现在还不能修任何一张真实照片**，原因有两个，都是硬阻塞：
 
-1. **"意图 vs 算法"这条规则在真实实现里撑不撑得住**
-2. **`processVersion` 机制可用** —— 同一文档在两版下渲染不同且都可复现
-3. **渲染契约能落地** —— `renderStack` 必须等于折叠 `renderStep`，容差 0
+1. **没有皮肤遮罩。** `protectNonSkin` 开启时，流程是：没有人脸 → 原样返回；**有人脸但没有遮罩 → 直接报错**。而检测器不存在，所以这个算子目前要么什么都不做，要么失败。
+2. **任何非 `skin` 算子都会让整条栈报错。** 真实文档必然有 `tone`（曝光/白平衡）。`renderStack` 折叠全部启用算子，遇到 `tone` 就抛 `unsupportedOperation`。
 
-**量化的验收标准**（上一轮实测得出）：
+所以第 1 步拆成两半，**先做遮罩**（它更基础）：
 
-| 面板 | 纹理能量保留 |
-|---|---:|
-| 原图 | 100% |
-| 朴素模糊 | **4.4%** ← 塑料脸 |
-| 频率分离 · texture 0.85 | **81.6%** ← 目标 |
+**1a. 皮肤遮罩** —— 新建 `PortraitAnalysis` 模块（Vision 在 macOS 和 iOS 都有，不是 UI 框架）：
 
-断言：`texturePreservation = 0.85` 时高频能量 ≥ 60%；`= 0.10` 时 ≤ 25%。
+- `VNDetectFaceRectanglesRequest` + `VNDetectFaceLandmarksRequest` → 填充已有的 `FaceAnalysis`
+- 由人脸框 + 关键点 + 肤色先验生成 `CGImage` 覆盖 → 喂给 `RenderContext.skinMask`
+- 这是模型里 `AnchoredPoint` 一直在等的东西，也是 MCP `analyze_faces` 工具的前提
+
+**1b. 补齐 `tone` / `presence` / `toneCurve`** —— 让真实文档能端到端渲染。
+
+**⚠️ 做 1a 之前需要你提供一张真实人像。** 现在手上的 1200×1600 是我合成的卡通脸——它能验证磨皮算法，但 **Vision 的人脸检测在卡通脸上不可靠**，用它调检测器会得到误导性的结论。你自己拍的人像最合适。
 
 **第 2 步：进程内 MCP server，只暴露 3 个工具**
 
-`analyze_faces` / `render_preview_with` / `set_stack`。跑通「AI 看图 → 提议 → 人确认 → 应用 → 再看图」就够验证架构。
+`analyze_faces` / `render_preview_with` / `set_stack`。跑通「AI 看图 → 提议 → 人确认 → 应用 → 再看图」就够验证架构。**依赖第 1 步的 `analyze_faces`。**
 
 **第 3 步：用真实片子校准 `SKILL-portrait-retouch.md`**
 
 里面那张强度表是起点不是答案。**这件事不用写代码，但它决定 AI 修出来的东西能不能看。**
+
+### 已经不需要再做的
+
+- ~~`skin` 算子 + 渲染契约验证~~ —— 4.6 已完成，我复核通过（见 4.7）
+- ~~真实图像首轮验证~~ —— 4.7 已完成，算法确认正确
+
+### 关于那些数字
+
+第 1 步的量化验收标准（`texturePreservation = 0.85` 时高频能量 ≥ 60%，`= 0.10` 时 ≤ 25%）**已在两版上通过**。但要注意 **4.7 记录的实测值（真实人像 88%/50%）与单元测试夹具（72%/1.2%）不可比**——两者用的高频度量不同（我的 FFT σ=9 高通 vs 测试的离散拉普拉斯），内核也不同。**以单元测试的指标为准**，它才是被指纹钉住的那个。
 
 ### 需要你定的决策
 
@@ -251,6 +321,13 @@ python3 scripts/i18n/missing.py
 
 ## 九、一句话总结
 
-**地基（数据模型）和工具链（构建/测试/UI 自动化/翻译）都验证过了；应用本身一行代码还没写。**
+**数据模型、国际化和工具链已验证；skin 的两版参考渲染器已实现并经独立复核（4.7），但还不能修任何一张真实照片。**
 
-下一个动作是 `skin` 算子——它同时验证渲染契约、`processVersion` 机制和"意图 vs 算法"这条规则，而且有量化的验收标准（纹理能量 81.6% vs 4.4%）。
+不是因为磨皮算法不对——算法是对的，只是缺两个前提：
+
+1. **没有皮肤遮罩**，所以 `skin` 要么什么都不做，要么直接报错
+2. **任何非 `skin` 算子都会让整条栈报错**，而真实文档必然有 `tone`
+
+下一步是先补这两个前提（见第六节的 1a / 1b），而不是继续加算子或搭 UI。
+
+> **做 1a 需要你提供一张真实人像**——现在只有我合成的卡通脸，Vision 在它上面不可靠。

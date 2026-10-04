@@ -12,6 +12,29 @@ permissions:
   contents: read
 
 jobs:
+  portrait:
+    name: PortraitCore and RetouchKit
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Select Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
+      - name: Test the model and reference renderer
+        working-directory: PortraitFoundation
+        run: swift test
+
+      - name: Build the libraries for iOS
+        working-directory: PortraitFoundation
+        run: >
+          swift build --triple arm64-apple-ios18.0
+          --sdk "$(xcrun --sdk iphoneos --show-sdk-path)"
+          --scratch-path "$RUNNER_TEMP/portrait-ios-build"
+
   unit:
     name: unit
     # Push covers same-repo branches. pull_request runs only for forks, so a PR is not tested twice.
