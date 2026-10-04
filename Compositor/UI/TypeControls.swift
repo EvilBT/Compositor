@@ -64,7 +64,7 @@ struct TypeControls: View {
                             }
                             .buttonStyle(.plain)
                             .help("Align " + alignment.rawValue.lowercased())
-                            .accessibilityLabel("Align " + alignment.rawValue.lowercased())
+                            .accessibilityLabel(String(localized: "Align") + " " + alignment.displayName)
                             .accessibilityAddTraits(selected ? .isSelected : [])
                         }
                     }
