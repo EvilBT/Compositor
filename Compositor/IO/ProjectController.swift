@@ -58,7 +58,7 @@ final class ProjectController {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do { try await ImageExporter.shared.exportPNG(snapshot, to: url) }
-        catch { await showError("Couldn’t export PNG", error: error) }
+        catch { await showError(NSLocalizedString("Couldn’t export PNG", comment: "Error alert title"), error: error) }
     }
 
     func canvasSize() async {
@@ -80,7 +80,7 @@ final class ProjectController {
         do {
             let resized = try await CanvasResizer.shared.resize(snapshot, to: options)
             session.applyDocumentSize(resized, actionName: "Canvas Size")
-        } catch { await showError("Couldn’t change canvas size", error: error) }
+        } catch { await showError(NSLocalizedString("Couldn’t change canvas size", comment: "Error alert title"), error: error) }
     }
 
     func imageSize() async {
@@ -102,7 +102,7 @@ final class ProjectController {
         do {
             let resized = try await ImageResizer.shared.resize(snapshot, to: options)
             session.applyImageSize(resized)
-        } catch { await showError("Couldn’t resize the image", error: error) }
+        } catch { await showError(NSLocalizedString("Couldn’t resize the image", comment: "Error alert title"), error: error) }
     }
 
     func trim() async {
@@ -126,7 +126,7 @@ final class ProjectController {
                 return
             }
             session.applyDocumentSize(resized, actionName: "Trim")
-        } catch { await showError("Couldn’t trim image", error: error) }
+        } catch { await showError(NSLocalizedString("Couldn’t trim image", comment: "Error alert title"), error: error) }
     }
 
     /// View > Grid Settings…: changes only how the grid is drawn and snapped to, so nothing is saved or undone. The
@@ -187,7 +187,7 @@ final class ProjectController {
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             try await ImageExporter.shared.write(data, to: url)
-        } catch { await showError("Couldn’t export JPEG", error: error) }
+        } catch { await showError(NSLocalizedString("Couldn’t export JPEG", comment: "Error alert title"), error: error) }
     }
 
     private func saveCurrent(asNew: Bool = false) async -> Bool {
@@ -237,7 +237,7 @@ final class ProjectController {
                 watchProject(at: destination)
                 return true
             } catch {
-                await showError("Couldn’t save the project", error: error)
+                await showError(NSLocalizedString("Couldn’t save the project", comment: "Error alert title"), error: error)
                 return false
             }
         }
@@ -270,7 +270,7 @@ final class ProjectController {
         // A recent project deleted in Finder: name the project, not the manifest inside it the load would miss.
         guard FileManager.default.fileExists(atPath: source.path) else {
             RecentProjects.shared.refresh()
-            await showError("Couldn’t open the project", error: CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: source.path]))
+            await showError(NSLocalizedString("Couldn’t open the project", comment: "Error alert title"), error: CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: source.path]))
             return false
         }
         let scoped = source.startAccessingSecurityScopedResource()
@@ -291,7 +291,7 @@ final class ProjectController {
             watchProject(at: source)
             return true
         } catch {
-            await showError("Couldn’t open the project", error: error)
+            await showError(NSLocalizedString("Couldn’t open the project", comment: "Error alert title"), error: error)
             return false
         }
     }
@@ -383,7 +383,7 @@ final class ProjectController {
             let urls = request.files.map(\.0)
             let projects = urls.filter { $0.pathExtension.lowercased() == "comp" }
             if projects.count > 1 {
-                await showError("Open one project at a time", error: ProjectError.invalid)
+                await showError(NSLocalizedString("Open one project at a time", comment: "Error alert title"), error: ProjectError.invalid)
             } else {
                 var proceed = true
                 if let project = projects.first { proceed = await open(project) }

@@ -16,28 +16,71 @@ value saved are the same string — blend modes, adjustment kinds, sampling. See
 `Compositor/Document/LocalizedDisplay.swift`: `rawValue` is the file format and never
 changes; `displayName` is what people read.
 
-## Regenerating
+## The one thing to understand before editing the catalog
 
-```sh
-python3 scripts/i18n/build_catalog.py     # writes Compositor/Localizable.xcstrings
-python3 scripts/i18n/missing.py           # lists displayed enum values with no translation
+**Xcode owns the catalog's key set, and it deletes what it did not put there.**
+
+Every build runs a sync that removes any entry it cannot find in the source. An entry added
+by hand is therefore gone by the next build — and worse, if the key *is* real but was
+written by hand, the rebuild recreates it **without its translation**, so the work is lost
+silently.
+
+Two consequences:
+
+- Never add a key to `Localizable.xcstrings` by hand. Make the source literal extractable
+  and let Xcode find it.
+- `build_catalog.py` only *fills in* values. It never invents keys, and it reports any
+  translation it could not place.
+
+The extractable forms are a **literal**:
+
+```swift
+Text("Import Images…")                       // SwiftUI looks the literal up
+String(localized: "Crop (C)")                // extracted
+NSLocalizedString("Add Mask", comment: "")   // extracted
 ```
 
-`build_catalog.py` merges `glossary.py` over `translations.py`; on a conflict the glossary
-wins, because those are the reviewed domain terms.
+and *not* a computed string or a variable key:
 
-## Finding strings still to translate
-
-```sh
-# Everything SwiftUI could localize, as potential keys
-xcrun xcstringstool extract --all-potential-swift-keys \
-  $(find Compositor -name '*.swift') -o /tmp/keys
+```swift
+NSLocalizedString(someVariable, comment: "") // invisible to extraction
+var label: String { "Crop (C)" }             // a String, not a key
 ```
 
-`--all-potential-swift-keys` over-collects on purpose — it also returns PSD four-character
-codes, UTIs and internal identifiers. **Do not translate those.** `"Layr"`, `"Btrn"`,
-`"Rght"` and friends are binary format keys from the Photoshop spec; translating one breaks
-PSD import in a way that looks like a corrupt file.
+That is why `NavigationTool.label` is a `switch` over literal `String(localized:)` calls
+rather than a table of Strings, and why the same three literals are repeated in
+`LocalizedDisplay.swift`'s doc comment as the reason `displayName` exists.
+
+## Pipeline
+
+```sh
+# 1. Add newly extracted keys to the catalog (a plain build prunes but never adds)
+xcodebuild -exportLocalizations -project Compositor.xcodeproj \
+  -localizationPath /tmp/xcloc -exportLanguage zh-Hans
+
+# 2. Fill in the translations
+python3 scripts/i18n/build_catalog.py
+
+# 3. Build and check
+python3 scripts/i18n/missing.py
+```
+
+`build_catalog.py` merges `glossary.py` over `prose*.py` over `translations.py`; on a
+conflict the glossary wins, because those are the reviewed domain terms.
+
+`missing.py` lists enum values the interface shows that have no translation — the same
+check `DisplayNameTests` makes, but faster to read.
+
+## Do not translate these
+
+`xcrun xcstringstool extract --all-potential-swift-keys` over-collects on purpose. Among
+what it returns are **PSD four-character codes from the Photoshop binary format**:
+`"Layr"`, `"Mtrn"`, `"Btrn"`, `"Rght"`, `"Btom"`, `"Rd  "`, `"Grn "`, `"Bl  "`, `"Txt "`,
+`"Clss"`, `"Idnt"`, `"Ornt"`. Translating one makes PSD import fail in a way that looks
+like a corrupt file.
+
+UTIs (`com.compositor.project`), `sRGB`, and the enum raw values in
+`LocalizedDisplay.swift` are the same category: they are identifiers, not copy.
 
 ## Terminology
 

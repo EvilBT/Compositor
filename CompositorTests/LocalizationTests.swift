@@ -151,8 +151,12 @@ struct DisplayNameTests {
     @Test("No translation is accidentally left in English")
     func noUntranslatedLeftovers() throws {
         let catalog = try Self.catalog()
+        // Symbols, units, format strings and proper nouns. Translating any of these would
+        // be wrong: `%lld` must stay a format specifier, and `RGB` is `RGB`.
         let intentionallyIdentical: Set<String> = [
-            "ASCII", "RGB", "HSL", "Floyd–Steinberg", "Camera Raw 滤镜",
+            "#", "%", "100%", "px",
+            "%lld", "%lld%%", "%lld × %lld px", "%lld°  %lld", "%@ × %@ px · sRGB",
+            "ASCII", "RGB", "HSL", "Floyd–Steinberg", "Compositor",
         ]
         var suspicious: [String] = []
         for (key, value) in catalog where key == value && !intentionallyIdentical.contains(key) {

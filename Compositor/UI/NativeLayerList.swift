@@ -42,6 +42,11 @@ struct NativeLayerList: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuItemValidation {
+        /// Identifies the Add Mask submenu by something that cannot be translated.
+        /// `validateMenuItem` used to compare the item's *title*, which would have stopped
+        /// matching the moment the menu was localized — the same trap `BlendModePicker` had.
+        static let addMaskMenuTag = 9001
+
         static let layerType = NSPasteboard.PasteboardType("com.compositor.layer-row")
         /// An Option-drag from a mask thumbnail: the id of the layer whose mask is being copied.
         static let effectType = NSPasteboard.PasteboardType("com.compositor.layer-effect")
@@ -116,13 +121,13 @@ struct NativeLayerList: NSViewRepresentable {
             let menu = NSMenu()
 
             // 1. Duplicate Layer
-            let duplicateItem = NSMenuItem(title: "Duplicate Layer", action: #selector(duplicateLayerAction), keyEquivalent: "")
+            let duplicateItem = NSMenuItem(title: NSLocalizedString("Duplicate Layer", comment: "Layer menu"), action: #selector(duplicateLayerAction), keyEquivalent: "")
             duplicateItem.target = self
             duplicateItem.isEnabled = validateMenuItem(duplicateItem)
             menu.addItem(duplicateItem)
 
             // 2. Rename…
-            let renameItem = NSMenuItem(title: "Rename…", action: #selector(renameLayerAction), keyEquivalent: "")
+            let renameItem = NSMenuItem(title: NSLocalizedString("Rename…", comment: "Layer menu"), action: #selector(renameLayerAction), keyEquivalent: "")
             renameItem.target = self
             renameItem.isEnabled = validateMenuItem(renameItem)
             menu.addItem(renameItem)
@@ -130,7 +135,7 @@ struct NativeLayerList: NSViewRepresentable {
             // 3. Delete Layer / Delete Selected Layers
             let deleteTitle: String
             if session.isMaskSelected && session.activeLayer?.mask != nil {
-                deleteTitle = "Delete Mask"
+                deleteTitle = NSLocalizedString("Delete Mask", comment: "Layer menu")
             } else if session.selectedLayerIDs.count > 1 {
                 deleteTitle = "Delete Selected Layers"
             } else {
@@ -144,28 +149,30 @@ struct NativeLayerList: NSViewRepresentable {
             menu.addItem(NSMenuItem.separator())
 
             // 4. Create Clipping Mask / Release Clipping Mask
-            let clippingTitle = session.activeLayer?.maskSourceID != nil ? "Release Clipping Mask" : "Create Clipping Mask"
+            let clippingTitle = session.activeLayer?.maskSourceID != nil
+                ? String(localized: "Release Clipping Mask")
+                : String(localized: "Create Clipping Mask")
             let clippingItem = NSMenuItem(title: clippingTitle, action: #selector(toggleClippingMaskAction), keyEquivalent: "")
             clippingItem.target = self
             clippingItem.isEnabled = validateMenuItem(clippingItem)
             menu.addItem(clippingItem)
 
             // 5. Group Selected Layers
-            let groupItem = NSMenuItem(title: "Group Selected Layers", action: #selector(groupSelectedLayersAction), keyEquivalent: "")
+            let groupItem = NSMenuItem(title: NSLocalizedString("Group Selected Layers", comment: "Layer menu"), action: #selector(groupSelectedLayersAction), keyEquivalent: "")
             groupItem.target = self
             groupItem.isEnabled = validateMenuItem(groupItem)
             menu.addItem(groupItem)
 
             // A folder right-clicked can be ungrouped: its layers stay where they are, and the folder goes.
             if rows[row].isGroup {
-                let ungroupItem = NSMenuItem(title: "Ungroup Layers", action: #selector(ungroupLayersAction), keyEquivalent: "")
+                let ungroupItem = NSMenuItem(title: NSLocalizedString("Ungroup Layers", comment: "Layer menu"), action: #selector(ungroupLayersAction), keyEquivalent: "")
                 ungroupItem.target = self
                 ungroupItem.isEnabled = validateMenuItem(ungroupItem)
                 menu.addItem(ungroupItem)
             }
 
             // 6. Move Out of Folder
-            let moveOutItem = NSMenuItem(title: "Move Out of Folder", action: #selector(moveOutOfFolderAction), keyEquivalent: "")
+            let moveOutItem = NSMenuItem(title: NSLocalizedString("Move Out of Folder", comment: "Layer menu"), action: #selector(moveOutOfFolderAction), keyEquivalent: "")
             moveOutItem.target = self
             moveOutItem.isEnabled = validateMenuItem(moveOutItem)
             menu.addItem(moveOutItem)
@@ -179,13 +186,14 @@ struct NativeLayerList: NSViewRepresentable {
             menu.addItem(NSMenuItem.separator())
 
             // 8. Add Mask >
-            let addMaskItem = NSMenuItem(title: "Add Mask", action: nil, keyEquivalent: "")
-            let addMaskSubmenu = NSMenu(title: "Add Mask")
-            let revealAllItem = NSMenuItem(title: "Reveal All (White)", action: #selector(addWhiteMaskAction), keyEquivalent: "")
+            let addMaskItem = NSMenuItem(title: NSLocalizedString("Add Mask", comment: "Layer menu"), action: nil, keyEquivalent: "")
+            addMaskItem.tag = Self.addMaskMenuTag
+            let addMaskSubmenu = NSMenu(title: NSLocalizedString("Add Mask", comment: "Layer menu"))
+            let revealAllItem = NSMenuItem(title: NSLocalizedString("Reveal All (White)", comment: "Layer menu"), action: #selector(addWhiteMaskAction), keyEquivalent: "")
             revealAllItem.target = self
             revealAllItem.isEnabled = validateMenuItem(revealAllItem)
             addMaskSubmenu.addItem(revealAllItem)
-            let hideAllItem = NSMenuItem(title: "Hide All (Black)", action: #selector(addBlackMaskAction), keyEquivalent: "")
+            let hideAllItem = NSMenuItem(title: NSLocalizedString("Hide All (Black)", comment: "Layer menu"), action: #selector(addBlackMaskAction), keyEquivalent: "")
             hideAllItem.target = self
             hideAllItem.isEnabled = validateMenuItem(hideAllItem)
             addMaskSubmenu.addItem(hideAllItem)
@@ -194,20 +202,20 @@ struct NativeLayerList: NSViewRepresentable {
             menu.addItem(addMaskItem)
 
             // 9. Enable Mask / Disable Mask
-            let toggleMaskTitle = session.activeLayer?.mask?.isEnabled == false ? "Enable Mask" : "Disable Mask"
+            let toggleMaskTitle = session.activeLayer?.mask?.isEnabled == false ? NSLocalizedString("Enable Mask", comment: "Layer menu") : NSLocalizedString("Disable Mask", comment: "Layer menu")
             let toggleMaskItem = NSMenuItem(title: toggleMaskTitle, action: #selector(toggleMaskAction), keyEquivalent: "")
             toggleMaskItem.target = self
             toggleMaskItem.isEnabled = validateMenuItem(toggleMaskItem)
             menu.addItem(toggleMaskItem)
 
             // 10. Delete Mask
-            let deleteMaskItem = NSMenuItem(title: "Delete Mask", action: #selector(deleteMaskAction), keyEquivalent: "")
+            let deleteMaskItem = NSMenuItem(title: NSLocalizedString("Delete Mask", comment: "Layer menu"), action: #selector(deleteMaskAction), keyEquivalent: "")
             deleteMaskItem.target = self
             deleteMaskItem.isEnabled = validateMenuItem(deleteMaskItem)
             menu.addItem(deleteMaskItem)
 
             // 11. Link Mask / Unlink Mask
-            let linkMaskTitle = session.activeLayer?.mask?.isLinked == false ? "Link Mask" : "Unlink Mask"
+            let linkMaskTitle = session.activeLayer?.mask?.isLinked == false ? NSLocalizedString("Link Mask", comment: "Layer menu") : NSLocalizedString("Unlink Mask", comment: "Layer menu")
             let linkMaskItem = NSMenuItem(title: linkMaskTitle, action: #selector(toggleMaskLinkAction), keyEquivalent: "")
             linkMaskItem.target = self
             linkMaskItem.isEnabled = validateMenuItem(linkMaskItem)
@@ -216,7 +224,9 @@ struct NativeLayerList: NSViewRepresentable {
             menu.addItem(NSMenuItem.separator())
 
             // 12. Hide Layer / Show Layer
-            let visibilityTitle = session.activeLayer?.isVisible == false ? "Show Layer" : "Hide Layer"
+            let visibilityTitle = session.activeLayer?.isVisible == false
+                ? String(localized: "Show Layer")
+                : String(localized: "Hide Layer")
             let visibilityItem = NSMenuItem(title: visibilityTitle, action: #selector(toggleVisibilityAction), keyEquivalent: "")
             visibilityItem.target = self
             visibilityItem.isEnabled = validateMenuItem(visibilityItem)
@@ -254,7 +264,7 @@ struct NativeLayerList: NSViewRepresentable {
             case #selector(toggleVisibilityAction):
                 return session.canEditLayers && session.activeLayer != nil
             default:
-                if menuItem.submenu != nil && menuItem.title == "Add Mask" {
+                if menuItem.submenu != nil && menuItem.tag == Self.addMaskMenuTag {
                     return session.canEditMask && session.activeLayer?.mask == nil
                 }
                 return true

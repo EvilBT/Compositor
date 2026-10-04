@@ -243,3 +243,15 @@ ZH = {
     # ---- tool rail labels (contain a shortcut hint) ----
     "No tool (A)": "无工具 (A)",
 }
+
+ZH.update({
+    "Add Mask": "添加蒙版",
+    "Clone Stamp (S) · Option-click sets the source": "仿制图章 (S) · 按住 Option 单击设置源点",
+    "Magic (W) · Tab switches Wand and Object": "魔棒 (W) · Tab 切换魔棒与对象",
+    "Rename…": "重命名…",
+})
+
+ZH.update({
+    "Shape (U) · Shift-U switches Rectangle/Ellipse": "形状 (U) · Shift-U 切换矩形/椭圆",
+    "Smear (R)": "涂抹 (R)",
+})
