@@ -102,12 +102,14 @@ swift build
 swift test
 ```
 
-### 本机（DSH 沙箱里）SwiftPM 起不来
+### 受限沙箱下 SwiftPM 起不来
 
-SwiftPM 会调 `sandbox-exec`，在外层沙箱里被拒：
+**只有会话的文件策略是 `workspace-write` 时才会遇到。** 策略是 `danger-full-access` 时 `swift test` 正常工作（已验证：16 个测试全绿）。
+
+受限时 SwiftPM 会调 `sandbox-exec`，在外层沙箱里被拒：
 `sandbox-exec: sandbox_apply: Operation not permitted`
 
-**用 `swiftc` 直编。** 已验证可用的两条命令：
+**这时用 `swiftc` 直编。** 已验证可用的两条命令：
 
 ```sh
 SDK=$(xcrun --show-sdk-path --sdk macosx)
