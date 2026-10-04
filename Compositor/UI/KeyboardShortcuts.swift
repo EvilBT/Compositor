@@ -60,16 +60,170 @@ struct ShortcutChord: Codable, Equatable, Hashable {
     }
 }
 
+/// Which section of the shortcuts editor a command appears under.
+///
+/// The `rawValue` is part of every definition's `id`, which is the key a customized
+/// shortcut is stored under in `UserDefaults`. Renaming a case would orphan every
+/// customization already made, so the raw values stay the English they have always been
+/// and `title` carries the localized one. The same split as `LocalizedDisplay.swift`.
+enum ShortcutGroup: String, CaseIterable, Identifiable {
+    case menus = "Menus"
+    case canvas = "Canvas & Layers"
+    case text = "Text Editing"
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .menus:  String(localized: "Menus")
+        case .canvas: String(localized: "Canvas & Layers")
+        case .text:   String(localized: "Text Editing")
+        }
+    }
+}
+
+/// Localized names for the shortcut table.
+///
+/// The table keeps English strings because they are also the stable half of each `id`. The
+/// literals have to appear somewhere for Xcode to extract them — `NSLocalizedString` on a
+/// variable is invisible to extraction, and a catalog entry written by hand is deleted by
+/// the next build — so this is that somewhere.
+enum ShortcutTitles {
+    static func localized(_ english: String) -> String {
+        switch english {
+        case "Actual Pixels": String(localized: "Actual Pixels")
+        case "Apply current canvas operation": String(localized: "Apply current canvas operation")
+        case "Blur / Smudge / Liquify": String(localized: "Blur / Smudge / Liquify")
+        case "Brush tool": String(localized: "Brush tool")
+        case "Cancel current canvas operation": String(localized: "Cancel current canvas operation")
+        case "Canvas Size": String(localized: "Canvas Size")
+        case "Clone Stamp": String(localized: "Clone Stamp")
+        case "Close Project": String(localized: "Close Project")
+        case "Content-Aware Fill": String(localized: "Content-Aware Fill")
+        case "Copy": String(localized: "Copy")
+        case "Copy Merged": String(localized: "Copy Merged")
+        case "Crop tool": String(localized: "Crop tool")
+        case "Curves": String(localized: "Curves")
+        case "Cut": String(localized: "Cut")
+        case "Cycle shape kind": String(localized: "Cycle shape kind")
+        case "Cycle tool mode": String(localized: "Cycle tool mode")
+        case "Decrease brush hardness": String(localized: "Decrease brush hardness")
+        case "Decrease brush size": String(localized: "Decrease brush size")
+        case "Decrease leading": String(localized: "Decrease leading")
+        case "Decrease tracking": String(localized: "Decrease tracking")
+        case "Delete selection / layer / effect / lasso point": String(localized: "Delete selection / layer / effect / lasso point")
+        case "Deselect": String(localized: "Deselect")
+        case "Down": String(localized: "Down")
+        case "Duplicate / Layer via Copy": String(localized: "Duplicate / Layer via Copy")
+        case "Eraser": String(localized: "Eraser")
+        case "Export JPEG": String(localized: "Export JPEG")
+        case "Export PNG": String(localized: "Export PNG")
+        case "Eyedropper tool": String(localized: "Eyedropper tool")
+        case "Fill with Background": String(localized: "Fill with Background")
+        case "Fill with Foreground": String(localized: "Fill with Foreground")
+        case "Finish editing text": String(localized: "Finish editing text")
+        case "Fit Canvas": String(localized: "Fit Canvas")
+        case "Gradient tool": String(localized: "Gradient tool")
+        case "Group Layers": String(localized: "Group Layers")
+        case "Hand tool": String(localized: "Hand tool")
+        case "Hide Compositor": String(localized: "Hide Compositor")
+        case "Hue/Saturation": String(localized: "Hue/Saturation")
+        case "Image Size": String(localized: "Image Size")
+        case "Increase brush hardness": String(localized: "Increase brush hardness")
+        case "Increase brush size": String(localized: "Increase brush size")
+        case "Increase leading": String(localized: "Increase leading")
+        case "Increase tracking": String(localized: "Increase tracking")
+        case "Inverse Selection": String(localized: "Inverse Selection")
+        case "Invert Pixels / Mask": String(localized: "Invert Pixels / Mask")
+        case "Lasso / cycle mode": String(localized: "Lasso / cycle mode")
+        case "Left": String(localized: "Left")
+        case "Levels": String(localized: "Levels")
+        case "Lock Guides": String(localized: "Lock Guides")
+        case "Magic": String(localized: "Magic")
+        case "Marquee / cycle shape": String(localized: "Marquee / cycle shape")
+        case "Merge Layers": String(localized: "Merge Layers")
+        case "Move / Transform tool": String(localized: "Move / Transform tool")
+        case "Move Layer Down": String(localized: "Move Layer Down")
+        case "Move Layer Up": String(localized: "Move Layer Up")
+        case "New Blank Layer": String(localized: "New Blank Layer")
+        case "New Canvas": String(localized: "New Canvas")
+        case "Next blend mode": String(localized: "Next blend mode")
+        case "Open Project": String(localized: "Open Project")
+        case "Paste": String(localized: "Paste")
+        case "Previous blend mode": String(localized: "Previous blend mode")
+        case "Redo": String(localized: "Redo")
+        case "Reset colors": String(localized: "Reset colors")
+        case "Right": String(localized: "Right")
+        case "Save": String(localized: "Save")
+        case "Save As": String(localized: "Save As")
+        case "Select All": String(localized: "Select All")
+        case "Select Subject": String(localized: "Select Subject")
+        case "Select tool": String(localized: "Select tool")
+        case "Shape tool": String(localized: "Shape tool")
+        case "Show Grid": String(localized: "Show Grid")
+        case "Show Guides": String(localized: "Show Guides")
+        case "Show Rulers": String(localized: "Show Rulers")
+        case "Show Transform Controls": String(localized: "Show Transform Controls")
+        case "Snap": String(localized: "Snap")
+        case "Spot Healing": String(localized: "Spot Healing")
+        case "Swap foreground/background": String(localized: "Swap foreground/background")
+        case "Temporary Hand tool (hold)": String(localized: "Temporary Hand tool (hold)")
+        case "Toggle Clipping Mask": String(localized: "Toggle Clipping Mask")
+        case "Toggle Levels preview": String(localized: "Toggle Levels preview")
+        case "Transform Layer / Selection": String(localized: "Transform Layer / Selection")
+        case "Type tool": String(localized: "Type tool")
+        case "Undo": String(localized: "Undo")
+        case "Ungroup Layers": String(localized: "Ungroup Layers")
+        case "Up": String(localized: "Up")
+        case "Zoom In": String(localized: "Zoom In")
+        case "Zoom Out": String(localized: "Zoom Out")
+        case "Zoom tool": String(localized: "Zoom tool")
+        default: english
+        }
+    }
+
+    /// Text-editing commands come in pairs, a normal step and a tenfold one.
+    static func byTen(_ english: String) -> String {
+        String(format: String(localized: "%@ by 10"), localized(english))
+    }
+
+    static func opacityDigit(_ digit: Int) -> String {
+        String(format: String(localized: "Opacity digit %lld (type two for exact %%)"), digit)
+    }
+
+    static func nudge(_ direction: String, _ pixels: Int, selected: Bool) -> String {
+        let dir = localized(direction)
+        return selected
+            ? String(format: String(localized: "Move selected pixels %@ %lld px"), dir, pixels)
+            : String(format: String(localized: "Nudge %@ %lld px"), dir, pixels)
+    }
+}
+
 struct ShortcutDefinition: Identifiable {
+    /// Stable across languages and across releases. It is the dictionary key a saved
+    /// override is stored under, so it is a storage format rather than a label — never
+    /// translate it, never rename it.
+    let id: String
+    /// Localized, for display and for the conflict message.
     let title: String
-    let group: String
+    let group: ShortcutGroup
     let original: ShortcutChord
-    var id: String { "\(group):\(title)" }
-    var isMenu: Bool { group == "Menus" }
+
+    var isMenu: Bool { group == .menus }
 
     static let all: [ShortcutDefinition] = {
-        func entry(_ title: String, _ key: String, _ modifiers: Int = 0, menu: Bool = false) -> ShortcutDefinition {
-            .init(title: title, group: menu ? "Menus" : "Canvas & Layers", original: ShortcutChord(key, modifiers))
+        func entry(_ english: String, _ key: String, _ modifiers: Int = 0, menu: Bool = false) -> ShortcutDefinition {
+            let group: ShortcutGroup = menu ? .menus : .canvas
+            return ShortcutDefinition(id: "\(group.rawValue):\(english)",
+                                      title: ShortcutTitles.localized(english),
+                                      group: group,
+                                      original: ShortcutChord(key, modifiers))
+        }
+        func textEntry(_ english: String, _ key: String, _ modifiers: Int) -> ShortcutDefinition {
+            ShortcutDefinition(id: "\(ShortcutGroup.text.rawValue):\(english)",
+                               title: ShortcutTitles.localized(english),
+                               group: .text,
+                               original: ShortcutChord(key, modifiers))
         }
         var result: [ShortcutDefinition] = [
             entry("Undo", "z", 1, menu: true), entry("Redo", "z", 9, menu: true),
@@ -111,16 +265,40 @@ struct ShortcutDefinition: Identifiable {
         result += [entry("Decrease brush hardness", "[", 8), entry("Increase brush hardness", "]", 8),
                    entry("Previous blend mode", "-", 8), entry("Next blend mode", "=", 8),
                    entry("Cycle shape kind", "u", 8)]
-        for digit in 0...9 { result.append(entry("Opacity digit \(digit) (type two for exact %)", String(digit))) }
-        for (direction, key) in [("Left", "\u{f702}"), ("Right", "\u{f703}"), ("Up", "\u{f700}"), ("Down", "\u{f701}")] {
-            result += [entry("Nudge \(direction) 1 px", key), entry("Nudge \(direction) 10 px", key, 8),
-                       entry("Move selected pixels \(direction) 1 px", key, 1), entry("Move selected pixels \(direction) 10 px", key, 9)]
+        for digit in 0...9 {
+            result.append(ShortcutDefinition(
+                // The id keeps the whole original English title, parentheses and all. It is
+                // the dictionary key an existing customization is stored under, so it looks
+                // like it wants tidying and must not be touched.
+                id: "\(ShortcutGroup.canvas.rawValue):Opacity digit \(digit) (type two for exact %)",
+
+                title: ShortcutTitles.opacityDigit(digit),
+                group: .canvas,
+                original: ShortcutChord(String(digit))))
         }
-        result.append(.init(title: "Finish editing text", group: "Text Editing", original: ShortcutChord("\r", 1)))
+        for (direction, key) in [("Left", "\u{f702}"), ("Right", "\u{f703}"), ("Up", "\u{f700}"), ("Down", "\u{f701}")] {
+            // Built from one format string each rather than from a String that already has
+            // the direction baked in: Xcode can only extract the literal.
+            func nudge(_ pixels: Int, _ modifiers: Int, selected: Bool) -> ShortcutDefinition {
+                let english = selected ? "Move selected pixels" : "Nudge"
+                let group: ShortcutGroup = .canvas
+                return ShortcutDefinition(
+                    id: "\(group.rawValue):\(english) \(direction) \(pixels) px",
+                    title: ShortcutTitles.nudge(direction, pixels, selected: selected),
+                    group: group,
+                    original: ShortcutChord(key, modifiers))
+            }
+            result += [nudge(1, 0, selected: false), nudge(10, 8, selected: false),
+                       nudge(1, 1, selected: true), nudge(10, 9, selected: true)]
+        }
+        result.append(textEntry("Finish editing text", "\r", 1))
         for (title, key) in [("Decrease tracking", "\u{f702}"), ("Increase tracking", "\u{f703}"),
                              ("Decrease leading", "\u{f700}"), ("Increase leading", "\u{f701}")] {
-            result.append(.init(title: title, group: "Text Editing", original: ShortcutChord(key, 2)))
-            result.append(.init(title: title + " by 10", group: "Text Editing", original: ShortcutChord(key, 10)))
+            result.append(textEntry(title, key, 2))
+            result.append(ShortcutDefinition(id: "\(ShortcutGroup.text.rawValue):\(title) by 10",
+                                             title: ShortcutTitles.byTen(title),
+                                             group: .text,
+                                             original: ShortcutChord(key, 10)))
         }
         result.append(entry("Toggle Levels preview", "p", 2))
         return result
@@ -168,7 +346,7 @@ final class ShortcutSettings {
         for definition in ShortcutDefinition.all {
             let chord = values[definition.id] ?? definition.original
             guard chord.key.count == 1, (0...15).contains(chord.modifiers) else { return "Choose a single key with optional modifiers." }
-            if definition.group == "Text Editing", chord.modifiers & 7 == 0 {
+            if definition.group == .text, chord.modifiers & 7 == 0 {
                 return "Text-editing shortcuts need Command, Option, or Control so they do not replace normal typing."
             }
             if [ShortcutChord("q", 1), ShortcutChord(",", 1), ShortcutChord("m", 3)].contains(chord) {
@@ -185,10 +363,10 @@ final class ShortcutSettings {
     func canvasEvent(_ event: NSEvent) -> NSEvent? {
         guard !overrides.isEmpty else { return event }
         let input = ShortcutChord(event)
-        if let definition = ShortcutDefinition.all.first(where: { $0.group == "Canvas & Layers" && chord($0) == input }) {
+        if let definition = ShortcutDefinition.all.first(where: { $0.group == .canvas && chord($0) == input }) {
             return definition.original == input ? event : definition.original.event(like: event)
         }
-        if ShortcutDefinition.all.contains(where: { $0.group != "Text Editing" && $0.original == input && chord($0) != input }) { return nil }
+        if ShortcutDefinition.all.contains(where: { $0.group != .text && $0.original == input && chord($0) != input }) { return nil }
         // Letter tool shortcuts traditionally also accept Shift. Follow the base
         // assignment unless Shift has its own explicit command (e.g. cycle shape).
         if input.modifiers == 8 {
@@ -203,7 +381,7 @@ final class ShortcutSettings {
 
     func textEvent(_ event: NSEvent) -> NSEvent? {
         guard !overrides.isEmpty else { return event }
-        let definitions = ShortcutDefinition.all.filter { $0.group == "Text Editing" || $0.original == ShortcutChord("\u{1b}") }
+        let definitions = ShortcutDefinition.all.filter { $0.group == .text || $0.original == ShortcutChord("\u{1b}") }
         let input = ShortcutChord(event)
         if let definition = definitions.first(where: { chord($0) == input }) {
             return definition.original == input ? event : definition.original.event(like: event)
@@ -239,11 +417,11 @@ private struct KeyboardShortcutsSheet: View {
             TextField("Search shortcuts", text: $search).textFieldStyle(.roundedBorder)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
-                    ForEach(["Menus", "Canvas & Layers", "Text Editing"], id: \.self) { group in
-                        Text(LocalizedStringKey(group)).font(.headline).padding(.top, 8)
+                    ForEach(ShortcutGroup.allCases) { group in
+                        Text(group.title).font(.headline).padding(.top, 8)
                         ForEach(ShortcutDefinition.all.filter { $0.group == group && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)) }) { definition in
                             HStack {
-                                Text(LocalizedStringKey(definition.title))
+                                Text(definition.title)
                                 Spacer()
                                 ShortcutRecorder(chord: draft[definition.id] ?? definition.original,
                                     recording: recording == definition.id,

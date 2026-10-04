@@ -12,6 +12,7 @@ Sources, later ones winning:
   translations.py   interface copy, the first batch
   prose.py          tooltips and help text, part one
   prose2.py         tooltips and help text, part two
+  shortcuts.py      the shortcuts editor, whose names differ from the menus
   glossary.py       enum values shown in the interface. Xcode cannot extract these: they
                     are looked up through a variable key in LocalizedDisplay.swift.
 """
@@ -24,13 +25,14 @@ sys.path.insert(0, HERE)
 from translations import ZH
 from prose import ZH_PROSE
 from prose2 import ZH_PROSE2
+from shortcuts import ZH_SHORTCUTS
 from glossary import ZH_ENUMS
 
 CATALOG = os.path.join(REPO, "Compositor", "Localizable.xcstrings")
 SOURCES = os.path.join(REPO, "Compositor")
 
 merged = {}
-for source in (ZH, ZH_PROSE, ZH_PROSE2, ZH_ENUMS):
+for source in (ZH, ZH_PROSE, ZH_PROSE2, ZH_SHORTCUTS, ZH_ENUMS):
     merged.update(source)
 
 with open(CATALOG, encoding="utf-8") as f:
