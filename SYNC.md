@@ -39,6 +39,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| 本轮文档提交 | Codex 核查 `c936dc4`：修正 STATUS 旧结论；回答未知算子测试问题；更正 max_size schema 与 SKILL 提示。本轮未改代码、未重跑测试。fetch 因 SSH 主机验证失败未完成 |
 | `8ba0f0e` | **重定 `--review` 的候选档位**：改为 `conservative 0.35/0.60`、`standard 0.65/0.30`（用户选定）、`strong 0.75/0.12`；并把重复两处的列表合并为 `PortraitHost.reviewCandidates`。三档的能量保留从 97/87/73% 拉开到 **87.8/54.2/30.4%**。`PROTOTYPE.md` 的旧数字已加注 |
 | `08c4404` | 第二张实片（`20261005.jpg`）验证：度量精确可复现、眼镜硬案例通过、发现四问题 |
 | `f18bc08` | 第三轮复核：PortraitAnalysis / PortraitRenderer / PortraitMCP 全部核实；MCP 端到端 16/16 |
@@ -110,7 +111,7 @@
 | 工具 | 缺口 |
 |---|---|
 | `set_stack` | `session_id` **必须是 UUID**，schema 只写 `string`；传非 UUID 抛的是 **`previewMismatch`**，指向"栈不匹配"，完全误导。**agent 第一次调用必踩。** |
-| `render_preview_with` | `max_size` 实际限定 **64...2048**，schema 只写 `integer`；越界抛 `invalidSize` 不说范围 |
+| `render_preview_with` | **更正：schema 已有 minimum 64 / maximum 2048**（Codex 核查 `MCPServer.swift` 第 188 行）；越界错误信息仍可改善 |
 
 ---
 
@@ -121,7 +122,7 @@
 | # | 问题 | 提给 | 需要什么 |
 |---|---|---|---|
 | 1 | ~~谁在改 `Sources/PortraitHost/main.swift` 的候选档位？~~ **已由我方完成，见「刚完成」。改动是加了一个 `reviewCandidates` 常量并替换两处内联列表——如果你也在改这个文件，冲突只会在那一行附近。** | — | — |
-| 2 | 未知算子（`unsupported`）在 `renderStack` 里的行为是否已测？ | 对方 | 我看到 `renderOrder` 排除它，但没找到专门测试 |
+| 2 | **已答：有测试**。`SkinRendererTests.stackParity` 添加未知算子、序列化回读后比较整栈与逐步折叠；`RetouchOpTests.disabledOpsAreKept` 检查未知算子保留且不进入 renderOrder。 | Codex | 源码核查；本轮未重跑 |
 
 ---
 
@@ -131,7 +132,7 @@
 |---|---|
 | 遮罩仅限人脸椭圆 | 脖子 / 胸口 / 耳朵不在覆盖内。**结构性限制**，两张实片都确认 |
 | `blemishStrength` 未实现 | 传非零抛错。**本轮最大的能力缺口** |
-| 候选档位太温和 | 三档 texture 0.85/0.70/0.55，但参数可到 0。用户已选 **0.30**（见第八节） |
+| 候选档位太温和 | **已解决，见 `8ba0f0e`**；当前三档为 0.35/0.60、0.65/0.30、0.75/0.12 |
 | 原生批准 UI 缺失 | `confirmed: true` 是客户端断言，不是同意证明 |
 | 完整分辨率导出 | 宿主只出 ≤2048px 预览 + 原生脸部特写，不出整图成片 |
 
@@ -146,9 +147,7 @@
 | 项目名 | 未定 | `Compositor` 有商标风险，且 `PortraitDocument.formatID` 是文件格式标识，越早定越好 |
 | 第一个客户端 | 未定 | 建议 iPad-first（Pencil 免费给压感） |
 
-> ⚠️ **`SKILL-portrait-retouch.md` 第 73 行写着「`texturePreservation` 低于 0.45 会出塑料脸」，
-> 与上面的 0.30 冲突。** 那个 0.45 是从一张浓妆女性照片推出来的，**不是普适阈值**。
-> 改那条之前先在第五节登记。
+> 已核查：`SKILL-portrait-retouch.md` 第 91–93 行已改为本次样本的 0.30，并明确不是普适常数；旧 0.45 冲突提示已过期。
 
 ---
 
