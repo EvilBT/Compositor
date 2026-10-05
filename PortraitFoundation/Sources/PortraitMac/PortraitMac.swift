@@ -28,6 +28,7 @@ final class PortraitModel: ObservableObject {
     @Published var undoCount = 0
     @Published var dirty = false
     private var documentURL: URL?
+    private var sourceURL: URL?
     @Published var title = "尚未打开照片"
     private var session: PortraitSession?
 
@@ -70,6 +71,7 @@ final class PortraitModel: ObservableObject {
             self.documentURL = exists ? saved : nil
             self.dirty = false
             self.session = session
+            self.sourceURL = url
             self.original = photo.image
             self.current = image
             self.candidate = nil
@@ -115,6 +117,19 @@ final class PortraitModel: ObservableObject {
             self.undoCount -= 1
             self.dirty = self.documentURL == nil
             self.message = "已撤销上一次应用。"
+        }
+    }
+
+    func export() {
+        guard let session, let sourceURL else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.png]
+        panel.nameFieldStringValue = sourceURL.deletingPathExtension().lastPathComponent + "-retouched.png"
+        panel.message = "按原照片尺寸导出已批准效果（最多 4000 万像素）。候选不会导出；请选择新文件名。"
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        run {
+            try await session.exportPNG(sourceURL: sourceURL, destinationURL: destination)
+            self.message = "原尺寸 PNG 已导出：" + destination.lastPathComponent
         }
     }
 
@@ -182,6 +197,7 @@ struct PortraitView: View {
             HStack {
                 Text(model.title).font(.headline)
                 Spacer()
+                Button("导出原尺寸") { model.export() }.disabled(model.original == nil)
                 Button("打开编辑") { model.openDocument() }
                 Button("保存编辑") { model.save() }.disabled(model.original == nil)
                 Button("打开照片") { model.open() }

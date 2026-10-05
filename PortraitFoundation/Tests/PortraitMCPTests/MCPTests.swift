@@ -3,7 +3,7 @@ import Testing
 import PortraitCore
 import PortraitMCP
 
-@Suite("MCP lifecycle and non-destructive transactions")
+@Suite("MCP lifecycle and non-destructive transactions", .serialized)
 struct MCPTests {
     private func photo() throws -> LoadedPhoto {
         var bytes = [UInt8](repeating: 128, count: 100 * 80 * 4)
@@ -193,6 +193,53 @@ struct MCPTests {
         _ = try await session.undo()
         let restored = try PortraitSession.open(photo: photo, documentURL: url)
         #expect(await restored.snapshot().document.ops.isEmpty)
+    }
+
+    @Test("Native export preserves source dimensions and excludes unapproved candidates")
+    func nativeExport() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("source.png")
+        var bytes = [UInt8](repeating: 100, count: 2200 * 100 * 4)
+        for i in stride(from: 3, to: bytes.count, by: 4) { bytes[i] = 255 }
+        try PhotoIO.encode(PhotoIO.image(bytes, width: 2200, height: 100)).write(to: source)
+        let originalData = try Data(contentsOf: source)
+        let photo = try PhotoIO.load(source), session = PortraitSession(photo: photo)
+        var tone = ToneParams(); tone.exposure = 1
+        let ticket = try await session.preview(stack: [RetouchOp(kind: .tone(tone))])
+        let unchanged = directory.appendingPathComponent("unchanged.png")
+        try await session.exportPNG(sourceURL: source, destinationURL: unchanged)
+        let original = try PhotoIO.loadFullResolution(unchanged)
+        #expect(original.width == 2200 && original.height == 100)
+        #expect(try PhotoIO.bytes(original) == bytes)
+        _ = try await session.approvePreview(ticket)
+        let edited = directory.appendingPathComponent("edited.png")
+        try await session.exportPNG(sourceURL: source, destinationURL: edited)
+        #expect(try PhotoIO.bytes(PhotoIO.loadFullResolution(edited)) != bytes)
+        await #expect(throws: PortraitSessionError.externalChange) {
+            try await session.exportPNG(sourceURL: source, destinationURL: source)
+        }
+        await #expect(throws: PortraitSessionError.externalChange) {
+            try await session.exportPNG(sourceURL: source, destinationURL: edited)
+        }
+        #expect(try Data(contentsOf: source) == originalData)
+        #expect(await session.snapshot().revision == 1)
+        if let path = ProcessInfo.processInfo.environment["PORTRAIT_EXPORT_TEST_PHOTO"] {
+            let url = URL(fileURLWithPath: path), real = try PhotoIO.load(url)
+            let realSession = PortraitSession(photo: real)
+            var skin = SkinParams(); skin.strength = 0.65; skin.texturePreservation = 0.30
+            let preview = try await realSession.preview(stack: [RetouchOp(kind: .skin(skin))])
+            _ = try await realSession.approvePreview(preview)
+            let output = directory.appendingPathComponent("real-export.png")
+            try await realSession.exportPNG(sourceURL: url, destinationURL: output)
+            let full = try PhotoIO.loadFullResolution(output)
+            #expect(full.width == real.reference.pixelSize.x && full.height == real.reference.pixelSize.y)
+            #expect(try PhotoIO.load(url).reference.contentHash == real.reference.contentHash)
+            if let artifact = ProcessInfo.processInfo.environment["PORTRAIT_EXPORT_TEST_OUTPUT"] {
+                try FileManager.default.copyItem(at: output, to: URL(fileURLWithPath: artifact))
+            }
+        }
     }
 
     @Test("Sidecars persist successful edits and undo; failed writes leave state unchanged")

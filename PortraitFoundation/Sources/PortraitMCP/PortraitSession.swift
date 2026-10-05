@@ -169,6 +169,27 @@ public actor PortraitSession {
         try preview(stack: document.ops, maximumDimension: maximumDimension).image
     }
 
+    /// Export only approved operations at upright source dimensions, never a pending ticket.
+    /// PNG uses the renderer's RGBA8 sRGB representation. Existing files are never replaced.
+    public func exportPNG(sourceURL: URL, destinationURL: URL) throws {
+        guard sourceURL.resolvingSymlinksInPath().standardizedFileURL != destinationURL.resolvingSymlinksInPath().standardizedFileURL,
+              !FileManager.default.fileExists(atPath: destinationURL.path) else { throw PortraitSessionError.externalChange }
+        let verified = try PhotoIO.load(sourceURL, maximumDimension: 64)
+        guard verified.reference.contentHash == photo.reference.contentHash,
+              verified.reference.pixelSize == photo.reference.pixelSize else { throw PortraitSessionError.unknownPhoto }
+        let input = try PhotoIO.loadFullResolution(sourceURL)
+        guard input.width == photo.reference.pixelSize.x, input.height == photo.reference.pixelSize.y else {
+            throw PhotoIOError.invalidSize
+        }
+        let analysis = try analyzeFaces()
+        let mask = try PhotoIO.resizeMask(analysis.skinMask, width: input.width, height: input.height)
+        let context = RenderContext(scale: .full, assets: [:], faces: analysis.faces,
+            processVersion: document.processVersion, sourcePixelSize: photo.reference.pixelSize, skinMask: mask)
+        let output = try PortraitRenderer(maximumPixels: 40_000_000).renderStack(document, input: input, context: context)
+        let data = try PhotoIO.encode(output)
+        try data.write(to: destinationURL, options: .withoutOverwriting)
+    }
+
     /// Save the current approved state and freeze analysis. New destinations must not exist.
     /// Once saved, later approved edits and undo persist to the same sidecar.
     public func save(to url: URL) throws {

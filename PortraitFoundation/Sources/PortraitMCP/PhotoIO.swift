@@ -46,6 +46,37 @@ public enum PhotoIO {
             id: String(digest.prefix(16)))
     }
 
+    /// Decode upright native pixels with an explicit export memory bound.
+    public static func loadFullResolution(_ url: URL, maximumPixels: Int = 40_000_000) throws -> CGImage {
+        guard maximumPixels > 0,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let metadata = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = metadata[kCGImagePropertyPixelWidth] as? Int,
+              let height = metadata[kCGImagePropertyPixelHeight] as? Int,
+              width > 0, height > 0, width <= maximumPixels / height else { throw PhotoIOError.invalidSize }
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: max(width, height),
+            kCGImageSourceShouldCacheImmediately: true
+        ] as CFDictionary) else { throw PhotoIOError.unreadableImage }
+        return image
+    }
+
+    /// Expand frozen preview coverage to the export surface without redetecting the face.
+    public static func resizeMask(_ mask: CGImage, width: Int, height: Int) throws -> CGImage {
+        guard width > 0, height > 0, width <= 40_000_000 / height,
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw PhotoIOError.invalidSize
+        }
+        context.interpolationQuality = .high
+        context.draw(mask, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let image = context.makeImage() else { throw PhotoIOError.encoding }
+        return image
+    }
+
     /// Canonical RGBA8 bytes for comparisons and review overlays, with top-left row order.
     public static func bytes(_ image: CGImage) throws -> [UInt8] {
         var result = [UInt8](repeating: 0, count: image.width * image.height * 4)
