@@ -19,6 +19,12 @@ The four rules that keep two agents from destroying each other's work:
 4. Before stopping: move your claim to "刚完成", add anything you verified to "已核实的事实",
    and leave questions for the other agent in "待对方回答".
 
+## Assigned work
+
+[TASKS.md](TASKS.md) is the work queue, written by whichever agent is reviewing. Claim a task in
+SYNC.md before starting it, do one at a time, and meet the definition of done in TASKS.md section 0
+before calling it finished — that section also lists what the reviewer will check independently.
+
 ## Project status
 
 - [STATUS.md](STATUS.md) is the long-form history: what has been built, what was verified, what
