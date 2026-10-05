@@ -20,6 +20,13 @@ public struct PreviewTicket: @unchecked Sendable {
     public let processVersion: Int
 }
 
+/// Full source and approved rendering for native-pixel inspection; no preview ticket is applied.
+public struct NativeInspection: @unchecked Sendable {
+    public let original: CGImage
+    public let approved: CGImage
+    public let faces: [FaceAnalysis]
+}
+
 /// One photo's state, owned in-process by the host. Previews never mutate its stack.
 /// Rendering and writes serialize, so a candidate cannot commit against a stale revision.
 public actor PortraitSession {
@@ -174,6 +181,13 @@ public actor PortraitSession {
     public func exportPNG(sourceURL: URL, destinationURL: URL) throws {
         guard sourceURL.resolvingSymlinksInPath().standardizedFileURL != destinationURL.resolvingSymlinksInPath().standardizedFileURL,
               !FileManager.default.fileExists(atPath: destinationURL.path) else { throw PortraitSessionError.externalChange }
+        let inspection = try inspectNative(sourceURL: sourceURL)
+        let data = try PhotoIO.encode(inspection.approved)
+        try data.write(to: destinationURL, options: .withoutOverwriting)
+    }
+
+    /// Render the same full-resolution approved pixels used by export, without writing a file.
+    public func inspectNative(sourceURL: URL) throws -> NativeInspection {
         let verified = try PhotoIO.load(sourceURL, maximumDimension: 64)
         guard verified.reference.contentHash == photo.reference.contentHash,
               verified.reference.pixelSize == photo.reference.pixelSize else { throw PortraitSessionError.unknownPhoto }
@@ -186,8 +200,7 @@ public actor PortraitSession {
         let context = RenderContext(scale: .full, assets: [:], faces: analysis.faces,
             processVersion: document.processVersion, sourcePixelSize: photo.reference.pixelSize, skinMask: mask)
         let output = try PortraitRenderer(maximumPixels: 40_000_000).renderStack(document, input: input, context: context)
-        let data = try PhotoIO.encode(output)
-        try data.write(to: destinationURL, options: .withoutOverwriting)
+        return NativeInspection(original: input, approved: output, faces: analysis.faces)
     }
 
     /// Save the current approved state and freeze analysis. New destinations must not exist.

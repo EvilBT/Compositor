@@ -214,9 +214,13 @@ struct MCPTests {
         #expect(original.width == 2200 && original.height == 100)
         #expect(try PhotoIO.bytes(original) == bytes)
         _ = try await session.approvePreview(ticket)
+        let inspection = try await session.inspectNative(sourceURL: source)
+        #expect(inspection.original.width == 2200)
+        #expect(try PhotoIO.bytes(inspection.original) == bytes)
         let edited = directory.appendingPathComponent("edited.png")
         try await session.exportPNG(sourceURL: source, destinationURL: edited)
         #expect(try PhotoIO.bytes(PhotoIO.loadFullResolution(edited)) != bytes)
+        #expect(try PhotoIO.bytes(PhotoIO.loadFullResolution(edited)) == PhotoIO.bytes(inspection.approved))
         await #expect(throws: PortraitSessionError.externalChange) {
             try await session.exportPNG(sourceURL: source, destinationURL: source)
         }

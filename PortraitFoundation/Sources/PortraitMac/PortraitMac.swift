@@ -19,6 +19,8 @@ struct PortraitMac: App {
 
 @MainActor
 final class PortraitModel: ObservableObject {
+    @Published var inspection: NativeInspection?
+    @Published var showingInspection = false
     @Published var original: CGImage?
     @Published var current: CGImage?
     @Published var candidate: PreviewTicket?
@@ -120,6 +122,14 @@ final class PortraitModel: ObservableObject {
         }
     }
 
+    func inspect() {
+        guard let session, let sourceURL else { return }
+        run {
+            self.inspection = try await session.inspectNative(sourceURL: sourceURL)
+            self.showingInspection = true
+        }
+    }
+
     func export() {
         guard let session, let sourceURL else { return }
         let panel = NSSavePanel()
@@ -197,6 +207,7 @@ struct PortraitView: View {
             HStack {
                 Text(model.title).font(.headline)
                 Spacer()
+                Button("检查脸部细节") { model.inspect() }.disabled(model.original == nil)
                 Button("导出原尺寸") { model.export() }.disabled(model.original == nil)
                 Button("打开编辑") { model.openDocument() }
                 Button("保存编辑") { model.save() }.disabled(model.original == nil)
@@ -226,6 +237,9 @@ struct PortraitView: View {
                 Button("撤销") { model.undo() }.disabled(model.undoCount == 0)
             }
         }
+        .sheet(isPresented: $model.showingInspection, onDismiss: { model.inspection = nil }) {
+            if let inspection = model.inspection { NativeDetailView(inspection: inspection) }
+        }
         .background(WindowCloseGuard(model: model))
         .onChange(of: strength) { model.candidate = nil }
         .onChange(of: texture) { model.candidate = nil }
@@ -251,6 +265,61 @@ struct PortraitView: View {
                 }
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct NativeDetailView: View {
+    let inspection: NativeInspection
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.displayScale) private var displayScale
+    @State private var selectedFace = -1
+    @State private var zoom = 1.0
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Text("原生像素检查 · 已批准效果").font(.headline)
+                Spacer()
+                Picker("区域", selection: $selectedFace) {
+                    Text("整图").tag(-1)
+                    ForEach(inspection.faces.indices, id: \.self) { i in Text("人脸 \(i + 1)").tag(i) }
+                }.frame(width: 180)
+                Picker("缩放", selection: $zoom) {
+                    Text("50%").tag(0.5)
+                    Text("100%").tag(1.0)
+                    Text("200%").tag(2.0)
+                }.frame(width: 150)
+                Button("完成") { dismiss() }
+            }
+            Text("100% 时一张照片像素对应一个屏幕像素。这里显示已批准结果，未批准候选不参与。")
+                .font(.caption).foregroundStyle(.secondary)
+            ScrollView([.horizontal, .vertical]) {
+                HStack(alignment: .top, spacing: 16) {
+                    detail("原图", image: inspection.original)
+                    detail("已批准效果", image: inspection.approved)
+                }.padding(8)
+            }.background(Color.black.opacity(0.9))
+        }
+        .padding(20).frame(width: 1080, height: 720)
+        .onAppear { if !inspection.faces.isEmpty { selectedFace = 0 } }
+    }
+
+    private func detail(_ title: String, image: CGImage) -> some View {
+        let crop = cropped(image)
+        return VStack {
+            Text(title).foregroundStyle(.white)
+            Image(decorative: crop, scale: displayScale).resizable().interpolation(.none)
+                .frame(width: Double(crop.width) * zoom / displayScale,
+                       height: Double(crop.height) * zoom / displayScale)
+        }
+    }
+
+    private func cropped(_ image: CGImage) -> CGImage {
+        guard inspection.faces.indices.contains(selectedFace) else { return image }
+        let bounds = inspection.faces[selectedFace].boundingBox
+        let rect = CGRect(x: bounds.origin.x * Double(image.width), y: bounds.origin.y * Double(image.height),
+                          width: bounds.size.x * Double(image.width), height: bounds.size.y * Double(image.height)).integral
+        return image.cropping(to: rect) ?? image
     }
 }
 
