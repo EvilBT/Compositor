@@ -27,7 +27,7 @@
 
 | 标识 | 区域 | 在做什么 | 开始于 |
 |---|---|---|---|
-| Codex | `MCPServer.swift`、`MCPTests.swift`、`STATUS.md`、`SYNC.md` | MCP 参数错误与无副作用验证；记录三端客户端主次 | 2026-10-05 |
+| （空） | | | |
 
 > **如果下面「刚完成」里有你正在碰的文件，先读它的 diff 再动手。**
 
@@ -39,6 +39,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| `84d87bf` | MCP UUID schema 与字段错误、尺寸范围提示。Release 41 项测试通过；新协议回归验证拒绝后文档不保存、revision 不变、票据仍可用。待另一工具独立复核。fetch/push 仍受 SSH 主机验证阻断 |
 | 本轮文档提交 | Codex 核查 `c936dc4`：修正 STATUS 旧结论；回答未知算子测试问题；更正 max_size schema 与 SKILL 提示。本轮未改代码、未重跑测试。fetch 因 SSH 主机验证失败未完成 |
 | `8ba0f0e` | **重定 `--review` 的候选档位**：改为 `conservative 0.35/0.60`、`standard 0.65/0.30`（用户选定）、`strong 0.75/0.12`；并把重复两处的列表合并为 `PortraitHost.reviewCandidates`。三档的能量保留从 97/87/73% 拉开到 **87.8/54.2/30.4%**。`PROTOTYPE.md` 的旧数字已加注 |
 | `08c4404` | 第二张实片（`20261005.jpg`）验证：度量精确可复现、眼镜硬案例通过、发现四问题 |
@@ -106,7 +107,9 @@
 4. **`swift build` 是 Debug。** 报性能数字前先 `-c release`。（见 4.1）
 5. **绝不翻译 PSD 四字符码**：`Layr` `Mtrn` `Rght` `Btom` `Rd  ` `Grn ` `Bl  ` `Txt ` `Clss` `Idnt` `Ornt`。
 
-### schema 与错误信息的缺口（已确认，未修）
+### schema 与错误信息（以下历史缺口已在 `84d87bf` 修复）
+
+`session_id`、`preview_id` 已声明 UUID，缺失或格式错误提示具体字段；未确认单独提示；`max_size` 越界与非整数明确提示范围 64...2048。Release 新增回归覆盖这些错误及票据重用。
 
 | 工具 | 缺口 |
 |---|---|
@@ -145,7 +148,7 @@
 | **男性人像的标准档** | **`strength 0.65` / `texturePreservation 0.30`** | 用户在 `20261005.jpg` 的四档对比中选定。理由：**男性磨皮过度不自然**，0.30 是下限，再低（0.10 / 0.00）就过了 |
 | **强度应当区分性别** | 待实现 | 用户 2026-10-05 提出，明确说**可以后面再实现** |
 | 项目名 | 未定 | `Compositor` 有商标风险，且 `PortraitDocument.formatID` 是文件格式标识，越早定越好 |
-| 第一个客户端 | 未定 | 建议 iPad-first（Pencil 免费给压感） |
+| 客户端范围 | Mac / iPad / iPhone 都做，可以分主次 | 用户本轮明确要求；Codex 推进安排为 Mac 优先、iPad 随后、iPhone 再接入，此顺序是实施安排 |
 
 > 已核查：`SKILL-portrait-retouch.md` 第 91–93 行已改为本次样本的 0.30，并明确不是普适常数；旧 0.45 冲突提示已过期。
 
