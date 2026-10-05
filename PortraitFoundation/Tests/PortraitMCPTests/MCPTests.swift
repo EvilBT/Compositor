@@ -106,6 +106,56 @@ struct MCPTests {
         #expect(await session.snapshot().document.ops.isEmpty)
     }
 
+    @Test("Invalid tool arguments explain the field without saving or consuming a preview")
+    func invalidArguments() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("edit.json")
+        let session = try PortraitSession.open(photo: photo(), documentURL: url)
+        let server = MCPServer(session: session)
+        _ = try await rpc(server, "initialize", .object([
+            "protocolVersion": .string("2025-06-18"), "capabilities": .object([:]),
+            "clientInfo": .object(["name": .string("test"), "version": .string("1")])]))
+        _ = try await rpc(server, "notifications/initialized", id: nil)
+        let listed = try #require(await rpc(server, "tools/list")?.objectValue?["result"]?.objectValue?["tools"]?.arrayValue)
+        let applySchema = try #require(listed.first(where: { $0.objectValue?["name"] == .string("set_stack") })?.objectValue?["inputSchema"]?.objectValue?["properties"]?.objectValue)
+        for field in ["session_id", "preview_id"] {
+            #expect(applySchema[field]?.objectValue?["format"] == .string("uuid"))
+        }
+        func rejection(_ tool: String, _ arguments: [String: JSONValue], containing message: String) async throws {
+            let result = try #require(await rpc(server, "tools/call", .object([
+                "name": .string(tool), "arguments": .object(arguments)]))?.objectValue?["result"]?.objectValue)
+            #expect(result["isError"] == .bool(true))
+            #expect(result["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue?.contains(message) == true)
+            #expect(await session.snapshot().revision == 0)
+            #expect(await session.snapshot().document.ops.isEmpty)
+            #expect(!FileManager.default.fileExists(atPath: url.path))
+        }
+        for size: JSONValue in [.int(63), .int(2049), .double(100.5), .string("100")] {
+            try await rejection("render_preview_with", ["photo_id": .string("fixture"), "stack": .array([]), "max_size": size], containing: "max_size must be an integer in 64...2048")
+        }
+        let ticket = try await session.preview(stack: [], maximumDimension: 100)
+        var arguments: [String: JSONValue] = ["photo_id": .string("fixture"), "stack": .array([]),
+            "preview_id": .string(ticket.id.uuidString), "session_id": .string(UUID().uuidString),
+            "expected_revision": .int(0), "confirmed": .bool(true)]
+        for field in ["session_id", "preview_id"] {
+            let valid = arguments[field]
+            for invalid: JSONValue? in [nil, .string("s1"), .int(1)] {
+                arguments[field] = invalid
+                try await rejection("set_stack", arguments, containing: "\(field) must be a UUID string")
+            }
+            arguments[field] = valid
+        }
+        arguments["confirmed"] = .bool(false)
+        try await rejection("set_stack", arguments, containing: "confirmed must be true")
+        arguments["confirmed"] = .bool(true)
+        let applied = try await rpc(server, "tools/call", .object(["name": .string("set_stack"), "arguments": .object(arguments)]))
+        #expect(applied?.objectValue?["result"]?.objectValue?["isError"] != .bool(true))
+        #expect(await session.snapshot().revision == 1)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
     @Test("Sidecars persist successful edits and undo; failed writes leave state unchanged")
     func persistence() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

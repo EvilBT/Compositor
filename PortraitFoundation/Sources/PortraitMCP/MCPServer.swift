@@ -88,7 +88,13 @@ public actor MCPServer {
                          "data": .string(try PhotoIO.encode(analysis.skinMask).base64EncodedString())])])])
         case "render_preview_with":
             let stack = try StackCodec.decode(arguments["stack"] ?? .null)
-            let size = try integer(arguments["max_size"], default: 1024)
+            let size: Int
+            if let value = arguments["max_size"] {
+                guard case .int(let requested) = value, (64...2048).contains(requested) else {
+                    throw ToolArgumentError("max_size must be an integer in 64...2048.")
+                }
+                size = requested
+            } else { size = 1024 }
             let version = try arguments["process_version"].map { try integer($0, default: 2) }
             let ticket = try await session.preview(stack: stack, maximumDimension: size, processVersion: version)
             let info = JSONValue.object([
@@ -101,11 +107,11 @@ public actor MCPServer {
                          "data": .string(try PhotoIO.encode(ticket.image, jpeg: true).base64EncodedString())]),
                 try textJSON(info)])])
         case "set_stack":
-            guard arguments["confirmed"] == .bool(true),
-                  let preview = arguments["preview_id"]?.stringValue.flatMap(UUID.init(uuidString:)),
-                  let sessionID = arguments["session_id"]?.stringValue.flatMap(UUID.init(uuidString:)) else {
-                throw PortraitSessionError.previewMismatch
+            guard arguments["confirmed"] == .bool(true) else {
+                throw ToolArgumentError("confirmed must be true after human approval.")
             }
+            let preview = try uuid(arguments["preview_id"], field: "preview_id")
+            let sessionID = try uuid(arguments["session_id"], field: "session_id")
             let stack = try StackCodec.decode(arguments["stack"] ?? .null)
             let revision = try await session.setStack(stack, previewID: preview,
                 expectedRevision: integer(arguments["expected_revision"], default: -1), sessionID: sessionID)
@@ -115,6 +121,13 @@ public actor MCPServer {
             ]))])])
         default: throw PortraitSessionError.unsupportedOperation
         }
+    }
+
+    private func uuid(_ value: JSONValue?, field: String) throws -> UUID {
+        guard let text = value?.stringValue, let id = UUID(uuidString: text) else {
+            throw ToolArgumentError("\(field) must be a UUID string.")
+        }
+        return id
     }
 
     private func integer(_ value: JSONValue?, default fallback: Int) throws -> Int {
@@ -144,6 +157,7 @@ public actor MCPServer {
                                         "required": .array(required.map(JSONValue.string)), "additionalProperties": .bool(false)])])
         }
         let string = JSONValue.object(["type": .string("string")])
+        let uuid = JSONValue.object(["type": .string("string"), "format": .string("uuid")])
         let integer = JSONValue.object(["type": .string("integer")])
         func number(_ low: Double, _ high: Double) -> JSONValue {
             .object(["type": .string("number"), "minimum": .double(low), "maximum": .double(high)])
@@ -188,7 +202,7 @@ public actor MCPServer {
                  ["photo_id": string, "stack": stack, "max_size": .object(["type": .string("integer"), "minimum": .int(64), "maximum": .int(2048)]),
                   "process_version": .object(["type": .string("integer"), "enum": .array([.int(1), .int(2)])])], ["photo_id", "stack"]),
             tool("set_stack", "Apply exactly a previewed candidate after human confirmation. Keep the canonical IDs returned in the preview.",
-                 ["photo_id": string, "stack": stack, "preview_id": string, "session_id": string,
+                 ["photo_id": string, "stack": stack, "preview_id": uuid, "session_id": uuid,
                   "expected_revision": integer, "confirmed": .object(["type": .string("boolean"), "const": .bool(true)])],
                  ["photo_id", "stack", "preview_id", "session_id", "expected_revision", "confirmed"])
         ])
@@ -232,4 +246,9 @@ public enum StackCodec {
             return try decoder.decode(RetouchOp.self, from: encoder.encode(JSONValue.object(envelope)))
         }
     }
+}
+
+private struct ToolArgumentError: Error, CustomStringConvertible {
+    let description: String
+    init(_ description: String) { self.description = description }
 }
