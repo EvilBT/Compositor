@@ -1,6 +1,6 @@
 # Notes for AI agents — PortraitFoundation
 
-这是**一个人像修图 App 的地基**：跨平台（Mac / iPad / iPhone）的声明式修饰模型。目前已有**数据模型与 `RetouchKit.SkinRenderer` 的版本化 CPU 参考实现，没有 UI、没有 App**。
+这是**一个人像修图 App 的地基**：跨平台（Mac / iPad / iPhone）的声明式修饰模型。目前已有**数据模型、版本化磨皮与基础调色渲染、Vision/色度皮肤覆盖、三个 MCP 工具及 headless 宿主；没有原生 UI**。使用与限制见 `PROTOTYPE.md`。
 
 现在它住在 Compositor 仓库的一个子目录里，将来会拆成独立仓库。**把它当成独立项目对待**：里面的东西不该依赖 Compositor，也不该反向影响它。
 
@@ -171,9 +171,9 @@ SKILL-portrait-retouch.md   修图方法论 —— 这是产品 know-how，不�
 
 ## 还没做（下一步的依赖顺序，不要并行）
 
-1. **渲染器实片验证与扩展** — `skin` 的两版参考实现和零容差一致性测试已完成。先验证真实人像、检测遮罩与性能，再扩展 `tone` / `presence` / `toneCurve`。实现限制见 `Sources/RetouchKit/README.md`。
-2. **进程内 MCP server，只暴露 3 个工具** — `analyze_faces` / `render_preview_with` / `set_stack`。跑通「AI 看图 → 提议 → 人确认 → 应用 → 再看图」就够验证架构。
-3. **用真实片子校准 `SKILL-portrait-retouch.md`** — 里面那张强度表是起点不是答案。
+1. **更多实片与原生界面** — 单张真实人像、保守覆盖及基础 develop+skin 已验证，仍需多样本、人工修正遮罩和完整导出。
+2. **MCP 客户端与确认界面** — 三个工具及 stdio 已实现，通信/保存/撤销已测；人工确认是客户端责任，目前尚无原生批准 UI。
+3. **继续校准 `SKILL-portrait-retouch.md`** — 首张实片记录已加入，等待人的偏好及更多肤色/角度/光照样本，不能把亮度标准差当纹理强度。
 
 **从这里开始，所有渲染都必须经过 `RetouchRenderer` 协议**，不许有"直接改像素"的旁路。`renderStep` 是定义，`renderStack` 是允许融合的优化，两者必须一致，而且**第一天就要有一致性测试**——Compositor 有两套完整合成器靠注释维系同步，那是它最大的技术债。
 

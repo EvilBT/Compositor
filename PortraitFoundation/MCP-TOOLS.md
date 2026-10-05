@@ -1,5 +1,7 @@
 # MCP 工具面
 
+> 当前实现：`PortraitMCP.MCPServer` + `portrait-mcp` stdio 宿主，只暴露 `analyze_faces` / `render_preview_with` / `set_stack`。其余工具是规划。启动、确认票据、保存与限制见 [PROTOTYPE.md](PROTOTYPE.md)。原生 UI 和 HTTP 尚未实现。
+
 让 AI 直接控制这个软件。当前成熟方案（Adobe 官方做法、Photoshop/Blender MCP 的实现）都收敛到同一个结构：
 
 ```

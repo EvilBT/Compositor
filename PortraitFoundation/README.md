@@ -14,7 +14,7 @@ Tests/RetouchKitTests/
   SkinRendererTests.swift
 ```
 
-已验证：Swift 6 严格并发下构建通过，数据模型 16 个测试和磨皮渲染 10 个测试全部通过；两个库均通过 iOS arm64 编译。
+已验证：Swift 6 严格并发下构建通过，数据模型、渲染、分析与 MCP 事务均有自动测试；库与原型宿主均通过 iOS arm64 编译。实际运行结果见 `STATUS.md`。
 
 ---
 
@@ -163,14 +163,13 @@ CI 已加入包测试及 iOS 编译。受限沙箱的替代验证方式见 `AGEN
 旧版和缺失版本字段的文档继续用 1。整栈绑定文档版本，单步通过 `RenderContext`
 接收版本。两个版本的输出有固定回归指纹，整栈与独立逐步折叠的像素差为 0。
 
-支持显式皮肤遮罩、纹理保留、透明度、遮罩扩张和预览半径缩放。尚无自动皮肤检测，
-非零 `blemishStrength` 和其他已知算子明确报错。合成纹理样本的结果及内存限制见
-[渲染器说明](Sources/RetouchKit/README.md)；尚未用真实人像验证效果。
+支持显式皮肤遮罩、纹理保留、透明度、遮罩扩张和预览半径缩放。
+非零 `blemishStrength` 明确报错。`PortraitRenderer` 已补齐 `tone` / `presence` / 点 `toneCurve` / 相对 `whiteBalance`；`PortraitAnalysis` 提供 Vision 关键点与保守皮肤遮罩。实片预览、MCP 与限制见 [原型说明](PROTOTYPE.md)。
 
 ---
 
 ## 还没做、但下一步该做的
 
-- **渲染器扩展与实片验证**：`skin` 参考实现已完成，后续加入检测、祛瑕疵及 `tone` / `presence` / `toneCurve`，校准真实人像效果与性能。
-- **`MCP-TOOLS.md`** 里那张工具表：进程内 MCP server，先只暴露 `analyze_faces` / `render_preview_with` / `set_stack` 三个，验证「看图 → 提议 → 确认 → 应用 → 再看图」闭环。
-- **`SKILL-portrait-retouch.md`**：把修图方法论从代码里拿出来。这是护城河，而且改它不用发版。
+- **进一步实片验证**：已用一张真实人像验证自动覆盖、三个磨皮候选和 MCP；仍需多肤色/光照/角度样本、祛瑕疵、完整皮肤分割与大图性能。
+- **原生界面与客户端接入**：三个工具的进程内处理及 stdio 宿主已实现，事务测试模拟了确认；真实人工确认 UI、原 App 接入和 HTTP 尚未实现。
+- **`SKILL-portrait-retouch.md`**：已加入首张实片的初步校准；需要人的偏好反馈和更多样本，不能泛化单张照片的阈值。

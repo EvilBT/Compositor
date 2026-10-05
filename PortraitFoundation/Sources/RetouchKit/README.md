@@ -71,5 +71,6 @@ from boundaries. Both versions must retain at least 60% at texture 0.85 and at m
 These are this fixture's measurements, not the earlier 81.6% / 4.4% experiment.
 Fixed output fingerprints match in Debug and Release and guard saved versions; independent folds check exact stack
 parity. Tests also cover masks, alpha, identity, preview scaling and explicit errors.
-Real portraits, detector-provided skin masks and device-to-device pixel parity still
-need validation before this becomes a production retouching tool.
+A first real portrait now has generated coverage and native face comparisons; see
+[the prototype](../../PROTOTYPE.md). The broader `PortraitRenderer` adds develop operations.
+Device-to-device pixel parity, diverse portraits and full-resolution export still need validation.

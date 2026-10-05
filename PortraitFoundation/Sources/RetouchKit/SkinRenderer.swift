@@ -133,7 +133,7 @@ public struct SkinRenderer: RetouchRenderer {
 
     // Three separable box passes approximate a Gaussian in linear time. Clamped edges
     // keep constant images constant, including at the outermost pixel.
-    private static func blur(_ input: [Float], width: Int, height: Int, radius: Int) -> [Float] {
+    static func blur(_ input: [Float], width: Int, height: Int, radius: Int) -> [Float] {
         var result = input
         for _ in 0..<3 {
             result = box(result, width: width, height: height, radius: radius, horizontal: true)
