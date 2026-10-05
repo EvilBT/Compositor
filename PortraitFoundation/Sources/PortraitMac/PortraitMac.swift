@@ -7,8 +7,12 @@ import PortraitMCP
 
 @main
 struct PortraitMac: App {
+    @NSApplicationDelegateAdaptor(PortraitAppDelegate.self) private var delegate
+    @StateObject private var model = PortraitModel()
     var body: some Scene {
-        WindowGroup("人像修图 · 原型") { PortraitView() }
+        Window("人像修图 · 原型", id: "portrait") {
+            PortraitView(model: model).onAppear { delegate.model = model }
+        }
             .defaultSize(width: 1120, height: 760)
     }
 }
@@ -22,6 +26,8 @@ final class PortraitModel: ObservableObject {
     @Published var message = "打开照片，查看磨皮预览，再决定是否应用。"
     @Published var error: String?
     @Published var undoCount = 0
+    @Published var dirty = false
+    private var documentURL: URL?
     @Published var title = "尚未打开照片"
     private var session: PortraitSession?
 
@@ -30,21 +36,46 @@ final class PortraitModel: ObservableObject {
         panel.allowedContentTypes = [.image]
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        load(url)
+        Task { if await allowDiscard() { load(url) } }
     }
 
-    func load(_ url: URL) {
+    func openDocument() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let documentURL = panel.url else { return }
+        do {
+            let document = try JSONDecoder().decode(PortraitDocument.self, from: Data(contentsOf: documentURL))
+            guard case .file(let relativePath) = document.photo.source else { return }
+            var photoURL = documentURL.deletingLastPathComponent().appendingPathComponent(relativePath)
+            if !FileManager.default.fileExists(atPath: photoURL.path) {
+                let source = NSOpenPanel()
+                source.allowedContentTypes = [.image]
+                source.message = "请选择这份编辑对应的原照片。"
+                guard source.runModal() == .OK, let selected = source.url else { return }
+                photoURL = selected
+            }
+            let selectedPhoto = photoURL
+            Task { if await allowDiscard() { load(selectedPhoto, documentURL: documentURL) } }
+        } catch { self.error = String(describing: error) }
+    }
+
+    func load(_ url: URL, documentURL: URL? = nil) {
         run {
             let photo = try await Task.detached { try PhotoIO.load(url, maximumDimension: 2048) }.value
             // Keep review state in memory until the user explicitly chooses a saved document.
-            let session = PortraitSession(photo: photo)
+            let saved = documentURL ?? url.appendingPathExtension("portrait.json")
+            let exists = FileManager.default.fileExists(atPath: saved.path)
+            let session = exists ? try PortraitSession.open(photo: photo, documentURL: saved) : PortraitSession(photo: photo)
+            let image = exists ? try await session.renderCurrent(maximumDimension: 2048) : photo.image
+            self.documentURL = exists ? saved : nil
+            self.dirty = false
             self.session = session
             self.original = photo.image
-            self.current = photo.image
+            self.current = image
             self.candidate = nil
             self.undoCount = 0
             self.title = url.lastPathComponent
-            self.message = "照片已打开。原图保持不变；编辑暂存在本次会话。"
+            self.message = exists ? "已恢复保存的编辑。" : "照片已打开；批准后请保存编辑。"
         }
     }
 
@@ -70,6 +101,7 @@ final class PortraitModel: ObservableObject {
             self.current = ticket.image
             self.candidate = nil
             self.undoCount += 1
+            self.dirty = self.documentURL == nil
             self.message = "效果已应用到本次会话，原图保持不变。"
         }
     }
@@ -81,7 +113,50 @@ final class PortraitModel: ObservableObject {
             self.current = try await session.renderCurrent(maximumDimension: 2048)
             self.candidate = nil
             self.undoCount -= 1
+            self.dirty = self.documentURL == nil
             self.message = "已撤销上一次应用。"
+        }
+    }
+
+    func save() {
+        run { _ = try await self.saveDocument() }
+    }
+
+    private func saveDocument() async throws -> Bool {
+        guard let session else { return false }
+        var destination = documentURL
+        if destination == nil {
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = title + ".portrait.json"
+            panel.message = "保存已批准的编辑；候选效果不会保存。请保存在原照片旁，以便打开照片时自动恢复。"
+            guard panel.runModal() == .OK, let url = panel.url else { return false }
+            destination = url
+        }
+        guard let destination else { return false }
+        try await session.save(to: destination)
+        documentURL = destination
+        dirty = false
+        message = "编辑已保存；后续应用与撤销将自动保存。"
+        return true
+    }
+
+    func allowDiscard() async -> Bool {
+        guard !busy else { return false }
+        guard dirty || candidate != nil else { return true }
+        let alert = NSAlert()
+        alert.messageText = "离开当前照片？"
+        alert.informativeText = "保存会保留已批准的编辑；尚未批准的候选会被放弃。"
+        alert.addButton(withTitle: "保存并继续")
+        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: "放弃并继续")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            busy = true
+            defer { busy = false }
+            do { return try await saveDocument() }
+            catch { self.error = String(describing: error); return false }
+        case .alertThirdButtonReturn: return true
+        default: return false
         }
     }
 
@@ -98,7 +173,7 @@ final class PortraitModel: ObservableObject {
 }
 
 struct PortraitView: View {
-    @StateObject private var model = PortraitModel()
+    @ObservedObject var model: PortraitModel
     @State private var strength = 0.65
     @State private var texture = 0.30
 
@@ -107,6 +182,8 @@ struct PortraitView: View {
             HStack {
                 Text(model.title).font(.headline)
                 Spacer()
+                Button("打开编辑") { model.openDocument() }
+                Button("保存编辑") { model.save() }.disabled(model.original == nil)
                 Button("打开照片") { model.open() }
             }
             HStack(spacing: 16) {
@@ -133,6 +210,9 @@ struct PortraitView: View {
                 Button("撤销") { model.undo() }.disabled(model.undoCount == 0)
             }
         }
+        .background(WindowCloseGuard(model: model))
+        .onChange(of: strength) { model.candidate = nil }
+        .onChange(of: texture) { model.candidate = nil }
         .padding(20)
         .frame(minWidth: 960, minHeight: 600)
         .disabled(model.busy)
@@ -155,6 +235,38 @@ struct PortraitView: View {
                 }
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+@MainActor
+final class PortraitAppDelegate: NSObject, NSApplicationDelegate {
+    weak var model: PortraitModel?
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let model else { return .terminateNow }
+        Task { sender.reply(toApplicationShouldTerminate: await model.allowDiscard()) }
+        return .terminateLater
+    }
+}
+
+struct WindowCloseGuard: NSViewRepresentable {
+    let model: PortraitModel
+    func makeCoordinator() -> Coordinator { Coordinator(model: model) }
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ view: NSView, context: Context) {
+        let coordinator = context.coordinator
+        DispatchQueue.main.async { view.window?.delegate = coordinator }
+    }
+    @MainActor final class Coordinator: NSObject, NSWindowDelegate {
+        let model: PortraitModel
+        private var closing = false
+        init(model: PortraitModel) { self.model = model }
+        func windowShouldClose(_ sender: NSWindow) -> Bool {
+            if closing { return true }
+            Task {
+                if await model.allowDiscard() { closing = true; sender.performClose(nil) }
+            }
+            return false
+        }
     }
 }
 

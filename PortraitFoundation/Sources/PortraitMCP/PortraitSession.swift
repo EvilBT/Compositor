@@ -32,7 +32,7 @@ public actor PortraitSession {
     private var revision = 0
     private var tickets: [UUID: PreviewTicket] = [:]
     private var history: [PortraitDocument] = []
-    private let storageURL: URL?
+    private var storageURL: URL?
     private var storedData: Data?
 
     /// Open a bounded photo for an in-process tool host or a future native UI.
@@ -167,6 +167,15 @@ public actor PortraitSession {
     /// Current output without requiring a new approval or modifying history.
     public func renderCurrent(maximumDimension: Int = 1024) throws -> CGImage {
         try preview(stack: document.ops, maximumDimension: maximumDimension).image
+    }
+
+    /// Save the current approved state and freeze analysis. New destinations must not exist.
+    /// Once saved, later approved edits and undo persist to the same sidecar.
+    public func save(to url: URL) throws {
+        let previousURL = storageURL, previousData = storedData
+        if url != storageURL { storageURL = url; storedData = nil }
+        do { try persist(document) }
+        catch { storageURL = previousURL; storedData = previousData; throw error }
     }
 
     private func validate(_ document: PortraitDocument) throws {

@@ -170,6 +170,31 @@ struct MCPTests {
         }
     }
 
+    @Test("Saving an in-memory session reopens approved pixels and rejects existing destinations")
+    func saveSession() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let photo = try photo(), session = PortraitSession(photo: photo)
+        var tone = ToneParams(); tone.exposure = 0.3
+        let ticket = try await session.preview(stack: [RetouchOp(kind: .tone(tone))], maximumDimension: 100)
+        _ = try await session.approvePreview(ticket)
+        let existing = directory.appendingPathComponent("existing.json")
+        let external = Data("external".utf8)
+        try external.write(to: existing)
+        await #expect(throws: PortraitSessionError.externalChange) { try await session.save(to: existing) }
+        #expect(try Data(contentsOf: existing) == external)
+        #expect(await session.snapshot().revision == 1)
+        let url = directory.appendingPathComponent("edit.json")
+        try await session.save(to: url)
+        let reopened = try PortraitSession.open(photo: photo, documentURL: url)
+        #expect(await reopened.snapshot().document.ops.first?.origin == .user)
+        #expect(try PhotoIO.bytes(await reopened.renderCurrent(maximumDimension: 100)) == PhotoIO.bytes(ticket.image))
+        _ = try await session.undo()
+        let restored = try PortraitSession.open(photo: photo, documentURL: url)
+        #expect(await restored.snapshot().document.ops.isEmpty)
+    }
+
     @Test("Sidecars persist successful edits and undo; failed writes leave state unchanged")
     func persistence() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

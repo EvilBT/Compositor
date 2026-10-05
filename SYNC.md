@@ -39,7 +39,8 @@
 
 | commit | 做了什么 |
 |---|---|
-| 本轮 Mac 提交 | 新 `PortraitMac` target；会话预览/批准/放弃/撤销；手动操作 user 归属。Release 构建与 42 项通过，真实 UI 照片预览→批准→撤销通过。按用户要求不远端同步；待另一工具独立复核 |
+| 本轮保存提交 | Mac 保存/打开编辑/自动恢复与退出保护。Release 43 项通过；保存重开像素一致、拒绝覆盖、撤销落盘。真实 UI 关闭提示→取消保留候选通过；完整文件对话框流程未自动化验证。待独立复核 |
+| `ad0c694` | 新 `PortraitMac` target；会话预览/批准/放弃/撤销；手动操作 user 归属。Release 构建与 42 项通过，真实 UI 照片预览→批准→撤销通过。按用户要求不远端同步；待另一工具独立复核 |
 | `84d87bf` | MCP UUID schema 与字段错误、尺寸范围提示。Release 41 项测试通过；新协议回归验证拒绝后文档不保存、revision 不变、票据仍可用。待另一工具独立复核。fetch/push 仍受 SSH 主机验证阻断 |
 | 本轮文档提交 | Codex 核查 `c936dc4`：修正 STATUS 旧结论；回答未知算子测试问题；更正 max_size schema 与 SKILL 提示。本轮未改代码、未重跑测试。fetch 因 SSH 主机验证失败未完成 |
 | `8ba0f0e` | **重定 `--review` 的候选档位**：改为 `conservative 0.35/0.60`、`standard 0.65/0.30`（用户选定）、`strong 0.75/0.12`；并把重复两处的列表合并为 `PortraitHost.reviewCandidates`。三档的能量保留从 97/87/73% 拉开到 **87.8/54.2/30.4%**。`PROTOTYPE.md` 的旧数字已加注 |
@@ -73,6 +74,8 @@
 | 整栈 == 独立逐步折叠，容差 0 | `SkinRendererTests.stackParity`，**故意传错误的 context 版本**再断言相等 |
 
 本轮新增验证：`swift test -c release --scratch-path /tmp/portrait-codex-mac` 全部 42 项通过；原生批准记 user、撤销后旧票据拒绝。真实 UI 经窗口操作验证生成预览、批准与撤销，截图布局可用。
+
+本轮保存验证：Release 43 项通过；`MCPTests.saveSession` 覆盖内存会话保存、重开同像素、拒绝既有路径且保留数据、撤销自动落盘。独立原生窗口验证关闭提示与取消保留候选。
 
 ### 4.3 MCP 层
 
