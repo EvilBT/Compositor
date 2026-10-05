@@ -178,28 +178,42 @@ public actor PortraitSession {
 
     /// Export only approved operations at upright source dimensions, never a pending ticket.
     /// PNG uses the renderer's RGBA8 sRGB representation. Existing files are never replaced.
-    public func exportPNG(sourceURL: URL, destinationURL: URL) throws {
+    public func exportPNG(sourceURL: URL, destinationURL: URL, progress: @Sendable (String) -> Void = { _ in }) throws {
         guard sourceURL.resolvingSymlinksInPath().standardizedFileURL != destinationURL.resolvingSymlinksInPath().standardizedFileURL,
               !FileManager.default.fileExists(atPath: destinationURL.path) else { throw PortraitSessionError.externalChange }
-        let inspection = try inspectNative(sourceURL: sourceURL)
+        try Task.checkCancellation()
+        let inspection = try inspectNative(sourceURL: sourceURL, progress: progress)
+        progress("正在编码 PNG")
+        try Task.checkCancellation()
         let data = try PhotoIO.encode(inspection.approved)
+        try Task.checkCancellation()
+        progress("正在写入成片")
         try data.write(to: destinationURL, options: .withoutOverwriting)
     }
 
     /// Render the same full-resolution approved pixels used by export, without writing a file.
-    public func inspectNative(sourceURL: URL) throws -> NativeInspection {
+    public func inspectNative(sourceURL: URL, progress: @Sendable (String) -> Void = { _ in }) throws -> NativeInspection {
+        try Task.checkCancellation()
+        progress("正在核对原照片")
         let verified = try PhotoIO.load(sourceURL, maximumDimension: 64)
         guard verified.reference.contentHash == photo.reference.contentHash,
               verified.reference.pixelSize == photo.reference.pixelSize else { throw PortraitSessionError.unknownPhoto }
+        try Task.checkCancellation()
+        progress("正在读取完整像素")
         let input = try PhotoIO.loadFullResolution(sourceURL)
         guard input.width == photo.reference.pixelSize.x, input.height == photo.reference.pixelSize.y else {
             throw PhotoIOError.invalidSize
         }
+        try Task.checkCancellation()
+        progress("正在准备皮肤覆盖")
         let analysis = try analyzeFaces()
         let mask = try PhotoIO.resizeMask(analysis.skinMask, width: input.width, height: input.height)
         let context = RenderContext(scale: .full, assets: [:], faces: analysis.faces,
             processVersion: document.processVersion, sourcePixelSize: photo.reference.pixelSize, skinMask: mask)
+        try Task.checkCancellation()
+        progress("正在渲染已批准效果")
         let output = try PortraitRenderer(maximumPixels: 40_000_000).renderStack(document, input: input, context: context)
+        try Task.checkCancellation()
         return NativeInspection(original: input, approved: output, faces: analysis.faces)
     }
 

@@ -229,6 +229,15 @@ struct MCPTests {
         }
         #expect(try Data(contentsOf: source) == originalData)
         #expect(await session.snapshot().revision == 1)
+        let cancelled = directory.appendingPathComponent("cancelled.png")
+        let cancelling = Task {
+            try await session.exportPNG(sourceURL: source, destinationURL: cancelled, progress: { _ in
+                withUnsafeCurrentTask { $0?.cancel() }
+            })
+        }
+        await #expect(throws: CancellationError.self) { try await cancelling.value }
+        #expect(!FileManager.default.fileExists(atPath: cancelled.path))
+        #expect(await session.snapshot().revision == 1)
         if let path = ProcessInfo.processInfo.environment["PORTRAIT_EXPORT_TEST_PHOTO"] {
             let url = URL(fileURLWithPath: path), real = try PhotoIO.load(url)
             let realSession = PortraitSession(photo: real)
@@ -244,6 +253,20 @@ struct MCPTests {
                 try FileManager.default.copyItem(at: output, to: URL(fileURLWithPath: artifact))
             }
         }
+    }
+
+    @Test("Cancelled native export creates no file and leaves approved state unchanged")
+    func cancelledExport() async throws {
+        let session = PortraitSession(photo: try photo())
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try await session.exportPNG(sourceURL: output.appendingPathExtension("source"), destinationURL: output)
+        }
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(!FileManager.default.fileExists(atPath: output.path))
+        #expect(await session.snapshot().revision == 0)
+        #expect(await session.snapshot().document.ops.isEmpty)
     }
 
     @Test("Sidecars persist successful edits and undo; failed writes leave state unchanged")

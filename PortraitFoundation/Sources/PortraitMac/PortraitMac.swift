@@ -25,6 +25,8 @@ final class PortraitModel: ObservableObject {
     @Published var current: CGImage?
     @Published var candidate: PreviewTicket?
     @Published var busy = false
+    @Published var canCancel = false
+    private var activeTask: Task<Void, Never>?
     @Published var message = "打开照片，查看磨皮预览，再决定是否应用。"
     @Published var error: String?
     @Published var undoCount = 0
@@ -124,8 +126,8 @@ final class PortraitModel: ObservableObject {
 
     func inspect() {
         guard let session, let sourceURL else { return }
-        run {
-            self.inspection = try await session.inspectNative(sourceURL: sourceURL)
+        run(cancellable: true) {
+            self.inspection = try await session.inspectNative(sourceURL: sourceURL, progress: self.reporter())
             self.showingInspection = true
         }
     }
@@ -137,8 +139,8 @@ final class PortraitModel: ObservableObject {
         panel.nameFieldStringValue = sourceURL.deletingPathExtension().lastPathComponent + "-retouched.png"
         panel.message = "按原照片尺寸导出已批准效果（最多 4000 万像素）。候选不会导出；请选择新文件名。"
         guard panel.runModal() == .OK, let destination = panel.url else { return }
-        run {
-            try await session.exportPNG(sourceURL: sourceURL, destinationURL: destination)
+        run(cancellable: true) {
+            try await session.exportPNG(sourceURL: sourceURL, destinationURL: destination, progress: self.reporter())
             self.message = "原尺寸 PNG 已导出：" + destination.lastPathComponent
         }
     }
@@ -185,13 +187,30 @@ final class PortraitModel: ObservableObject {
         }
     }
 
-    private func run(_ operation: @escaping @MainActor () async throws -> Void) {
+    func cancel() {
+        activeTask?.cancel()
+        canCancel = false
+        message = "正在取消，将在当前处理阶段结束后停止。"
+    }
+
+    private func reporter() -> @Sendable (String) -> Void {
+        { [weak self] stage in
+            Task { @MainActor in
+                guard let self, self.busy, self.canCancel else { return }
+                self.message = stage
+            }
+        }
+    }
+
+    private func run(cancellable: Bool = false, _ operation: @escaping @MainActor () async throws -> Void) {
         guard !busy else { return }
         busy = true
         error = nil
-        Task {
-            defer { busy = false }
+        canCancel = cancellable
+        activeTask = Task {
+            defer { busy = false; canCancel = false; activeTask = nil }
             do { try await operation() }
+            catch is CancellationError { message = "处理已取消，已批准编辑保持不变。" }
             catch { self.error = String(describing: error) }
         }
     }
@@ -246,6 +265,11 @@ struct PortraitView: View {
         .padding(20)
         .frame(minWidth: 960, minHeight: 600)
         .disabled(model.busy)
+        .overlay(alignment: .bottomTrailing) {
+            if model.busy && model.canCancel {
+                Button("取消处理") { model.cancel() }.padding(20)
+            }
+        }
         .onAppear {
             if model.original == nil, let path = CommandLine.arguments.dropFirst().first, path.hasPrefix("/") {
                 model.load(URL(fileURLWithPath: path))
