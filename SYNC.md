@@ -39,6 +39,8 @@
 
 | commit | 做了什么 |
 |---|---|
+| `c7a3266`…`3eeaac9` | **对方完成**：MCP schema/错误信息修复、原生 Mac 批准 UI（`PortraitMac`，387 行）、原尺寸 PNG 导出、保存/重开/退出保护、处理阶段状态与取消 |
+| （本次复核） | 我方独立验证对方这 8 个提交：45 项测试 Debug+Release 通过、iOS 仍可编译、Mac UI 实机起窗。**发现一个新问题，见第五节第 6 条** |
 | 本轮取消提交 | 全尺寸导出/检查阶段状态及取消；Release 45 项通过，预取消及阶段回调取消都不出文件、不改 revision。仅阶段边界取消，单次渲染/编码不可内部中断；真实 UI 取消本轮未自动化验证 |
 | `66a1730` | 原生像素人脸/整图对比，50/100/200% 缩放；inspectNative 与导出共用路径。Release 44 项通过，测试断言检查图与导出逐像素一致；真实 UI 人脸1/100%布局/200%滚动/完成返回通过 |
 | `444a9d4` | Mac 原尺寸 PNG（≤40MP）、源哈希与拒绝覆盖。Release 44 项通过；实片 7008×4672 输出已核对。并发 MCP suite 等待停滞，顺序执行后通过，根因待独立复核 |
@@ -62,10 +64,11 @@
 
 | 事实 | 验证方式 |
 |---|---|
-| 40 个测试通过（模型 16 / 渲染 15 / 分析 2 / MCP 7） | `swift test` **和** `swift test -c release` |
+| **45 个测试通过**（模型 16 / 渲染 15 / 分析 2 / MCP 12） | `swift test` **和** `swift test -c release` |
 | iOS arm64 能编译，**含 MCP 可执行文件** | `swift build --triple arm64-apple-ios18.0 ...` |
 | 核心 target 不引入 AppKit/UIKit；独立 `PortraitMac` 使用 AppKit/SwiftUI | 历史检查覆盖旧 Sources；本轮源码核查 UI import 只在新增 Mac target |
 | **`swift build` 默认是 Debug（`-Onone`）** | 同一渲染 Debug 5058 ms vs Release 372 ms。**报性能数字前必须指定配置** |
+| **Mac UI 必须打成 `.app` bundle 才会出现窗口** | 裸可执行文件：Accessibility 查到 **0 个窗口**；同一二进制放进 `.app`：**1 个窗口**。`swift run portrait-mac` 会静默什么都不显示 |
 
 ### 4.2 渲染契约
 
