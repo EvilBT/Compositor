@@ -349,6 +349,28 @@ struct NativeDetailView: View {
 
 @MainActor
 final class PortraitAppDelegate: NSObject, NSApplicationDelegate {
+    override init() {
+        super.init()
+        NSApplication.shared.setActivationPolicy(.regular)
+    }
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // SwiftPM launches without a bundle's LSUIElement/activation defaults.
+        // Establish a regular application before SwiftUI creates its window scene.
+        NSApplication.shared.setActivationPolicy(.regular)
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        if ProcessInfo.processInfo.environment["PORTRAIT_STARTUP_DIAGNOSTICS"] == "1" {
+            DispatchQueue.main.async {
+                let windows = NSApplication.shared.windows.filter { $0.isVisible }
+                let report = "visibleWindows=\(windows.count); titles=\(windows.map(\.title))\n"
+                FileHandle.standardError.write(Data(report.utf8))
+            }
+        }
+    }
+
     weak var model: PortraitModel?
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let model else { return .terminateNow }
