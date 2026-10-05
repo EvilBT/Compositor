@@ -3,7 +3,7 @@ import Testing
 import PortraitCore
 import PortraitMCP
 
-@Suite("MCP lifecycle and non-destructive transactions", .serialized)
+@Suite("MCP lifecycle and non-destructive transactions")
 struct MCPTests {
     private func photo() throws -> LoadedPhoto {
         var bytes = [UInt8](repeating: 128, count: 100 * 80 * 4)
@@ -267,6 +267,30 @@ struct MCPTests {
         #expect(!FileManager.default.fileExists(atPath: output.path))
         #expect(await session.snapshot().revision == 0)
         #expect(await session.snapshot().document.ops.isEmpty)
+    }
+
+    @Test("Concurrent independent sessions finish Vision and persist without losing transactions")
+    func concurrentSessions() async throws {
+        let fixture = try photo()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0..<16 {
+                let url = directory.appendingPathComponent("edit-\(index).json")
+                group.addTask {
+                    let session = try PortraitSession.open(photo: fixture, documentURL: url)
+                    var tone = ToneParams(); tone.exposure = 0.2
+                    let ticket = try await session.preview(stack: [RetouchOp(kind: .tone(tone))], maximumDimension: 100)
+                    #expect(try await session.approvePreview(ticket) == 1)
+                    let reopened = try PortraitSession.open(photo: fixture, documentURL: url)
+                    #expect(try PhotoIO.bytes(await reopened.renderCurrent(maximumDimension: 100)) == PhotoIO.bytes(ticket.image))
+                    #expect(try await session.undo() == 2)
+                    #expect(await session.snapshot().document.ops.isEmpty)
+                }
+            }
+            try await group.waitForAll()
+        }
     }
 
     @Test("Sidecars persist successful edits and undo; failed writes leave state unchanged")

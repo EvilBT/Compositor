@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import Dispatch
 import PortraitAnalysis
 import PortraitCore
 import RetouchKit
@@ -30,6 +31,16 @@ public struct NativeInspection: @unchecked Sendable {
 /// One photo's state, owned in-process by the host. Previews never mutate its stack.
 /// Rendering and writes serialize, so a candidate cannot commit against a stale revision.
 public actor PortraitSession {
+    private nonisolated let executor = PortraitSessionExecutor()
+
+    // Vision perform() waits for GCD work. Running it on the cooperative executor can
+    // exhaust every worker when separate sessions detect faces concurrently. A serial
+    // GCD executor keeps blocking framework calls off that pool without making the
+    // persistence transaction reentrant or allowing two edits to commit together.
+    public nonisolated var unownedExecutor: UnownedSerialExecutor {
+        executor.asUnownedSerialExecutor()
+    }
+
     public let photoID: String
     private let photo: LoadedPhoto
     private let analyzer: FaceAnalyzer
@@ -273,4 +284,13 @@ private struct AnalysisCache: Codable {
     let geometry: [FaceGeometry]
     let warnings: [String]
     let mask: Data
+}
+
+private final class PortraitSessionExecutor: SerialExecutor, @unchecked Sendable {
+    private let queue = DispatchQueue(label: "portrait.session", qos: .userInitiated)
+
+    func enqueue(_ job: consuming ExecutorJob) {
+        let job = UnownedJob(job)
+        queue.async { job.runSynchronously(on: self.asUnownedSerialExecutor()) }
+    }
 }
