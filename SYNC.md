@@ -39,6 +39,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| 本轮 Mac 提交 | 新 `PortraitMac` target；会话预览/批准/放弃/撤销；手动操作 user 归属。Release 构建与 42 项通过，真实 UI 照片预览→批准→撤销通过。按用户要求不远端同步；待另一工具独立复核 |
 | `84d87bf` | MCP UUID schema 与字段错误、尺寸范围提示。Release 41 项测试通过；新协议回归验证拒绝后文档不保存、revision 不变、票据仍可用。待另一工具独立复核。fetch/push 仍受 SSH 主机验证阻断 |
 | 本轮文档提交 | Codex 核查 `c936dc4`：修正 STATUS 旧结论；回答未知算子测试问题；更正 max_size schema 与 SKILL 提示。本轮未改代码、未重跑测试。fetch 因 SSH 主机验证失败未完成 |
 | `8ba0f0e` | **重定 `--review` 的候选档位**：改为 `conservative 0.35/0.60`、`standard 0.65/0.30`（用户选定）、`strong 0.75/0.12`；并把重复两处的列表合并为 `PortraitHost.reviewCandidates`。三档的能量保留从 97/87/73% 拉开到 **87.8/54.2/30.4%**。`PROTOTYPE.md` 的旧数字已加注 |
@@ -59,7 +60,7 @@
 |---|---|
 | 40 个测试通过（模型 16 / 渲染 15 / 分析 2 / MCP 7） | `swift test` **和** `swift test -c release` |
 | iOS arm64 能编译，**含 MCP 可执行文件** | `swift build --triple arm64-apple-ios18.0 ...` |
-| `Sources/` 里零 AppKit/UIKit | `grep -rn 'import AppKit\|import UIKit\|import Cocoa' Sources/` |
+| 核心 target 不引入 AppKit/UIKit；独立 `PortraitMac` 使用 AppKit/SwiftUI | 历史检查覆盖旧 Sources；本轮源码核查 UI import 只在新增 Mac target |
 | **`swift build` 默认是 Debug（`-Onone`）** | 同一渲染 Debug 5058 ms vs Release 372 ms。**报性能数字前必须指定配置** |
 
 ### 4.2 渲染契约
@@ -70,6 +71,8 @@
 | 参数曲线与 refineSaturation 显式拒绝 | `PortraitRenderError.unsupportedCurveOption` |
 | skin 的 v1/v2 字节指纹**未被改动** | `SkinRendererTests` 通过；`git diff` 只把 `blur` 从 private 改 internal |
 | 整栈 == 独立逐步折叠，容差 0 | `SkinRendererTests.stackParity`，**故意传错误的 context 版本**再断言相等 |
+
+本轮新增验证：`swift test -c release --scratch-path /tmp/portrait-codex-mac` 全部 42 项通过；原生批准记 user、撤销后旧票据拒绝。真实 UI 经窗口操作验证生成预览、批准与撤销，截图布局可用。
 
 ### 4.3 MCP 层
 
@@ -136,7 +139,7 @@
 | 遮罩仅限人脸椭圆 | 脖子 / 胸口 / 耳朵不在覆盖内。**结构性限制**，两张实片都确认 |
 | `blemishStrength` 未实现 | 传非零抛错。**本轮最大的能力缺口** |
 | 候选档位太温和 | **已解决，见 `8ba0f0e`**；当前三档为 0.35/0.60、0.65/0.30、0.75/0.12 |
-| 原生批准 UI 缺失 | `confirmed: true` 是客户端断言，不是同意证明 |
+| 原生批准 UI | Mac 手动会话已实现并实机走通；MCP 的 confirmed 仍是客户端断言，AI 候选尚未接入该 UI |
 | 完整分辨率导出 | 宿主只出 ≤2048px 预览 + 原生脸部特写，不出整图成片 |
 
 ---

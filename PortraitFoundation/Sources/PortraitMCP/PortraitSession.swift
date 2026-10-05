@@ -119,6 +119,17 @@ public actor PortraitSession {
     /// Unchanged operations keep their provenance; changed operations belong to this session.
     public func setStack(_ stack: [RetouchOp], previewID: UUID, expectedRevision: Int,
                          sessionID: UUID, model: String? = nil) throws -> Int {
+        try commit(stack, previewID: previewID, expectedRevision: expectedRevision,
+                   origin: .ai(sessionID: sessionID, model: model))
+    }
+
+    /// Apply a manually reviewed candidate with user provenance, after an explicit UI action.
+    public func approvePreview(_ ticket: PreviewTicket) throws -> Int {
+        try commit(ticket.stack, previewID: ticket.id, expectedRevision: ticket.revision, origin: .user)
+    }
+
+    private func commit(_ stack: [RetouchOp], previewID: UUID, expectedRevision: Int,
+                        origin: OpOrigin) throws -> Int {
         guard revision == expectedRevision else { throw PortraitSessionError.staleRevision }
         guard let ticket = tickets[previewID] else { throw PortraitSessionError.previewNotFound }
         guard ticket.revision == revision, ticket.stack == stack else { throw PortraitSessionError.previewMismatch }
@@ -128,7 +139,7 @@ public actor PortraitSession {
         candidate.ops = stack.map { op in
             if existing[op.id] == op { return op }
             var tagged = op
-            tagged.origin = .ai(sessionID: sessionID, model: model)
+            tagged.origin = origin
             return tagged
         }
         candidate.processVersion = ticket.processVersion

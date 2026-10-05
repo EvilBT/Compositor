@@ -1,6 +1,8 @@
 # 项目状态
 
-最新进度（2026-10-05，`84d87bf`）：MCP 的 session_id / preview_id 已声明 UUID，并给出逐字段错误；未确认与非法 max_size 分别明确提示。Release 全部 41 项测试通过（16 Core / 15 Render / 2 Analysis / 8 MCP）。新增协议回归确认拒绝后不保存文档、不改变 revision、不消耗票据，修正参数后仍可应用。本轮未改渲染算法。用户要求 Mac / iPad / iPhone 都做、允许分主次；推进安排为 Mac 优先验证预览、批准与撤销，再接 iPad、iPhone，共享核心；原生 UI 尚未实现。远端同步仍被 SSH 主机验证失败阻断。
+最新进度（2026-10-05）：Mac 原生会话原型已完成，产品 `portrait-mac`；支持打开照片、原图/候选对比、磨皮参数、生成预览、明确批准、放弃候选和撤销。共用 PortraitSession 与渲染契约；新增 `approvePreview` 将手动操作记为 user，AI MCP 路径仍记 AI。Release 构建与 42 项测试通过（16 Core / 15 Render / 2 Analysis / 9 MCP）；新测试验证用户归属、撤销及旧票据拒绝。已在真实窗口用 `0229_95_1.jpg` 验证预览→批准→撤销，并查看截图布局。文件选择器可以打开，但其路径输入自动化未完成；真实照片通过启动参数载入。可运行原型位于 `/Users/xiaoman/Developer/assets/PortraitPrototype.app`。本轮按用户要求跳过远端同步。
+
+当前限制：Mac 仅内存会话，退出后编辑不保留；没有完整分辨率导出、缩放查看、AI 客户端批准桥接、iPad/iPhone UI。原型使用已选男性标准 0.65/0.30 作初始参数，仍需用户按照片调整。下一步：保存/重开编辑文档与退出保护，再推进完整导出和 AI 候选接入。开发运行：`swift run -c release --package-path PortraitFoundation portrait-mac /absolute/path/photo.jpg`。AppKit/SwiftUI 只在独立 Mac target 内，核心不引入平台 UI 依赖。
 
 > 工作文档。每次开工先看这里，收工前更新这里。
 >

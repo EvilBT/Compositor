@@ -156,6 +156,20 @@ struct MCPTests {
         #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
+    @Test("Native approval uses user provenance and undo invalidates an older candidate")
+    func nativeApproval() async throws {
+        let session = PortraitSession(photo: try photo())
+        var tone = ToneParams(); tone.exposure = 0.3
+        let ticket = try await session.preview(stack: [RetouchOp(kind: .tone(tone))], maximumDimension: 100)
+        #expect(try await session.approvePreview(ticket) == 1)
+        #expect(await session.snapshot().document.ops.first?.origin == .user)
+        #expect(try await session.undo() == 2)
+        #expect(await session.snapshot().document.ops.isEmpty)
+        await #expect(throws: PortraitSessionError.staleRevision) {
+            try await session.approvePreview(ticket)
+        }
+    }
+
     @Test("Sidecars persist successful edits and undo; failed writes leave state unchanged")
     func persistence() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
