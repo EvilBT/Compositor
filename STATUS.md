@@ -1,5 +1,13 @@
 # 项目状态
 
+最新进度（2026-10-06，分割离线试跑 / `9428549`）：用户授权尝试 SegFace/FaRL，新增独立 `scripts/face-parsing/` 评估工具与锁定环境清单。对20261005.jpg双脸运行 SegFace Swin-B/512、MobileNet/512、FaRL CelebM/448，均成功。原图6240×4160；baseline为现有host在2048px预览生成的覆盖，映射到源图的人脸方形裁切；Swin/MobileNet使用ImageNet归一化，完整checkpoint严格加载；FaRL采用官方RetinaFace、对齐和warp。原始19类输出及比较图、源/权重哈希在 `/Users/xiaoman/Developer/assets/face-parsing-trial/comparison/`；源哈希未变。模型与代码下载，照片仅本机处理。
+
+视觉观察（非人工标注精度评测）：学习模型的额头/发际线覆盖比现有启发式更连续，能单独标记眼镜；MobileNet在人脸1手边纸巾附近产生皮肤小块误选。三者仍无胡须独立类别，镜片整体作为眼镜保护将同时排除镜片后的可见皮肤。FaRL边界较平滑，但尚不能凭两张脸断言胜过Swin。CPU四线程单次前向：Swin两脸0.810/0.732秒，MobileNet0.329/0.313秒；FaRL含检测1.812/1.648秒。不同对齐路径、不同输入、未测稳态，不能作为架构公平排名或手机速度。
+
+输出检查：三个模型各两脸、类ID0–18、2400×550比较图和源文件保持断言通过，脚本语法检查及两张图目视检查通过。本轮仅实验脚本/文档，未改Swift源或应用；未重跑Swift49项、未验证CoreML/ANE、未改变已存coverage或processVersion。复现命令与upstream提交见脚本README，运行日志 `/tmp/portrait-parsing-evaluate.log`。输出图：品红=皮肤+鼻子，青色=眼镜，金色=头发；不是应用实际修改像素。下一步用更多实片及人工标注验证Swin/FaRL，并测试CoreML转换再决定接入；T3/T8均未认领。远端同步继续按用户要求跳过。
+
+以下为前轮历史记录：
+
 最新进度（2026-10-06，比较方式 / `e44f819`）：按用户本轮要求，原生细节窗口新增「分割滑动」「修改区域」「差值 ×4」，保留「并排」，默认分割。左侧原图、右侧已批准效果，拖动位置支持0–100%，无障碍调整每次5%。修改区域以品红叠加标出 canonical RGBA8 中任何改变的像素（零阈值），显示当前区域改变像素数；差值为逐通道绝对差、显示放大4倍，黑色为未改变。仅用于检查，不进入文档渲染和导出；没有修改磨皮参数、模型格式或 processVersion。
 
 Debug/Release各49项（16 Core / 18 Render / 2 Analysis / 13 MCP）通过；新增比较回归覆盖相同图零变化、1字节差异也标记、差值增益、源数据保持、尺寸/增益拒绝。iOS arm64编译通过，UI import仅在PortraitMac，既有skin指纹通过。日志 `/tmp/portrait-comparison-debug.log`、`/tmp/portrait-comparison-release.log`、`/tmp/portrait-comparison-ios.log`。
