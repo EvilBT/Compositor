@@ -1,5 +1,15 @@
 # 项目状态
 
+最新进度（2026-10-06，比较方式 / `e44f819`）：按用户本轮要求，原生细节窗口新增「分割滑动」「修改区域」「差值 ×4」，保留「并排」，默认分割。左侧原图、右侧已批准效果，拖动位置支持0–100%，无障碍调整每次5%。修改区域以品红叠加标出 canonical RGBA8 中任何改变的像素（零阈值），显示当前区域改变像素数；差值为逐通道绝对差、显示放大4倍，黑色为未改变。仅用于检查，不进入文档渲染和导出；没有修改磨皮参数、模型格式或 processVersion。
+
+Debug/Release各49项（16 Core / 18 Render / 2 Analysis / 13 MCP）通过；新增比较回归覆盖相同图零变化、1字节差异也标记、差值增益、源数据保持、尺寸/增益拒绝。iOS arm64编译通过，UI import仅在PortraitMac，既有skin指纹通过。日志 `/tmp/portrait-comparison-debug.log`、`/tmp/portrait-comparison-release.log`、`/tmp/portrait-comparison-ios.log`。
+
+独立测试app使用20261005.jpg的临时副本，生成0.65/0.30候选→批准→原生人脸检查→修改区域和差值截图检查→分割拖动，AX位置从50%变25%，调整动作也验证55%。人脸1当前裁切845480像素，364683像素有改动；这是此图此参数实际差异，不能当质量或覆盖保证。测试会话退出时放弃保存，未改用户源照片或编辑文件。最终小改动将初始人脸选择放入初始化，避免开窗先计算整图再切人脸；最终代码已重跑两种配置测试并构建，完整UI流程在此前仅差这一初始化的版本上验证。
+
+应用已更新 `/Users/xiaoman/Developer/assets/PortraitPrototype.app`，重启生效。大图比较按区域生成两张诊断图，内存仍较高；切换区域会丢弃旧结果，但已开始的诊断计算尚不支持内部取消。细节仅显示已批准结果；未批准候选不参与。T3未认领，下一队列任务仍是斑点检测。按用户要求暂不远端同步。
+
+以下为前轮历史记录：
+
 最新进度（2026-10-06，T2 / `334c224`）：并发挂起已定位并修复。恢复 MCP suite 并发后复现，sample 显示8个 cooperative 工作线程阻塞在 Vision 同步 perform（FaceAnalyzer.swift:58），等待 VNControlledCapacityTasksQueue；这次挂起不是票据耗尽或 NSFileCoordinator。PortraitSession 现使用每会话独立串行 GCD SerialExecutor，把阻塞框架处理移出 cooperative pool，保持 actor 隔离和同步提交不重入。未修改图像算法、模型格式或 processVersion。
 
 已去掉 MCPTests 的 serialized；新增16独立会话并发 Vision、批准/保存、重开像素一致与撤销回归。Debug、Release各46项（16 Core / 15 Render / 2 Analysis / 13 MCP）通过，iOS arm64编译通过，核心target零AppKit/UIKit，既有skin指纹通过。并发回归 Debug 0.308秒 / Release 0.322秒，包含全部会话流程，不是单张渲染性能。没有加超时或重试。

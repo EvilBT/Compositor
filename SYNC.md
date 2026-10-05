@@ -43,7 +43,6 @@
 
 | 标识 | 区域 | 在做什么 | 开始于 |
 |---|---|---|---|
-| （空） | | | |
 
 > **如果下面「刚完成」里有你正在碰的文件，先读它的 diff 再动手。**
 
@@ -55,6 +54,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| `e44f819` | 用户要求：原生检查增加分割滑动、实际修改像素叠加、差值×4，保留并排。Debug/Release各49项、iOS通过；实片副本批准后截图与拖动50%→25%验证；仅诊断不改算法/导出。T3未认领 |
 | `334c224` | T2：复现并采样，8个 cooperative 工作线程等待 Vision perform。PortraitSession 使用专用串行 GCD executor，去掉测试 serialized；新增16会话并发检测/保存/重开/撤销回归。Debug/Release各46项、iOS编译通过 |
 | （复核） | **T1 独立验收通过**。复核方环境有辅助访问权限，因此用了比实现方更强的方式：裸可执行文件 `osascript` 查到 1 个窗口、标题正确、`frontmost=true`；`.app` bundle 同样 1 个；45 项测试 Debug 通过；iOS 编译通过；`applicationShouldTerminate` 的 diff 为零。**额外确认 UI 内容真的渲染**——直接调 AX API 拿到 30 个元素（实现方因无权限只能看到窗口数）。详见下方「已核实的事实」 |
 | `b25f38a` | T1：提前设置 regular 激活策略。裸 swift run 自身诊断 1 个可见窗口、正确标题；bundle CUA 1 个窗口，退出确认/取消保留候选通过。Debug/Release 各45、iOS编译通过。osascript 被辅助访问权限拒绝，使用启动诊断替代；按用户要求不远端同步 |
@@ -111,6 +111,8 @@
 ### T2 根因复核证据（2026-10-06）
 
 移除 serialized 后旧执行方式挂起；`/tmp/portrait-t2-before-sample.txt` 中8个 `com.apple.root.default-qos.cooperative` 线程同时停在 `PortraitSession.analyzeFaces → FaceAnalyzer.analyze`（FaceAnalyzer.swift:58）`VNImageRequestHandler.perform → VNControlledCapacityTasksQueue.dispatchGroupWait`。采样没有停在票据或 NSFileCoordinator，没有 actor await 环：会话相关方法均同步隔离，测试各自有独立会话。修复将会话隔离执行放到串行 GCD executor，避免同步 Vision 等待占满 cooperative pool，保留非重入事务顺序。Debug/Release各46项通过，新增16个独立会话并发回归；测试不再 serialized。证据日志 `/tmp/portrait-t2-debug.log`、`/tmp/portrait-t2-release.log`、`/tmp/portrait-t2-ios.log`。
+
+本轮比较验证（2026-10-06，`e44f819`）：Debug/Release各49项，iOS编译通过；ImageComparisonTests验证零变化、微小差异和输入拒绝。真实窗口男人人脸1修改区域364683/845480、差值截图、左右分割拖动50%→25%，无障碍调整55%；测试使用临时副本且退出不保存。最终人脸初始化优化后重跑测试/构建，未重跑整套UI。仅检查已批准结果，增益不影响导出；大图诊断内存较高，计算中不支持内部取消。
 
 ### 4.3 MCP 层
 
