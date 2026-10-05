@@ -26,7 +26,7 @@
 
 | 编号 | 任务 | 优先级 | 状态 |
 |---|---|---|---|
-| T1 | 让 `swift run portrait-mac` 出窗口 | P0 | ✅ `b25f38a` 已完成 |
+| T1 | 让 `swift run portrait-mac` 出窗口 | P0 | ✅ `b25f38a`，**复核方已独立验收** |
 | T2 | 根治 MCP 测试套件的并发等待 | P0 | ⬜ 待认领 |
 | T3 | 斑点检测 | P1 | ⬜ 待认领 |
 | T4 | `.blemish` 算子渲染 | P1 | ⬜ 待认领 |
@@ -55,6 +55,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| （复核） | **T1 独立验收通过**。复核方环境有辅助访问权限，因此用了比实现方更强的方式：裸可执行文件 `osascript` 查到 1 个窗口、标题正确、`frontmost=true`；`.app` bundle 同样 1 个；45 项测试 Debug 通过；iOS 编译通过；`applicationShouldTerminate` 的 diff 为零。**额外确认 UI 内容真的渲染**——直接调 AX API 拿到 30 个元素（实现方因无权限只能看到窗口数）。详见下方「已核实的事实」 |
 | `b25f38a` | T1：提前设置 regular 激活策略。裸 swift run 自身诊断 1 个可见窗口、正确标题；bundle CUA 1 个窗口，退出确认/取消保留候选通过。Debug/Release 各45、iOS编译通过。osascript 被辅助访问权限拒绝，使用启动诊断替代；按用户要求不远端同步 |
 | `c7a3266`…`3eeaac9` | **对方完成**：MCP schema/错误信息修复、原生 Mac 批准 UI（`PortraitMac`，387 行）、原尺寸 PNG 导出、保存/重开/退出保护、处理阶段状态与取消 |
 | （本次复核） | 我方独立验证对方这 8 个提交：45 项测试 Debug+Release 通过、iOS 仍可编译、Mac UI 实机起窗。**发现一个新问题，见第五节第 6 条** |
