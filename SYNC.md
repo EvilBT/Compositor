@@ -29,6 +29,8 @@
 |---|---|---|---|
 | （空） | | | |
 
+> **如果下面「刚完成」里有你正在碰的文件，先读它的 diff 再动手。**
+
 ---
 
 ## 三、刚完成
@@ -37,6 +39,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| （本次） | **重定 `--review` 的候选档位**：改为 `conservative 0.35/0.60`、`standard 0.65/0.30`（用户选定）、`strong 0.75/0.12`；并把重复两处的列表合并为 `PortraitHost.reviewCandidates`。三档的能量保留从 97/87/73% 拉开到 **87.8/54.2/30.4%**。`PROTOTYPE.md` 的旧数字已加注 |
 | `08c4404` | 第二张实片（`20261005.jpg`）验证：度量精确可复现、眼镜硬案例通过、发现四问题 |
 | `f18bc08` | 第三轮复核：PortraitAnalysis / PortraitRenderer / PortraitMCP 全部核实；MCP 端到端 16/16 |
 | `3cec931` | skin 参考渲染器复核 + `box` 的泛型特化优化（Release 1.35×，Debug 3.7×） |
@@ -117,7 +120,7 @@
 
 | # | 问题 | 提给 | 需要什么 |
 |---|---|---|---|
-| 1 | 谁在改 `Sources/PortraitHost/main.swift` 的候选档位？ | 对方 | 一句话确认，避免两边同时改 |
+| 1 | ~~谁在改 `Sources/PortraitHost/main.swift` 的候选档位？~~ **已由我方完成，见「刚完成」。改动是加了一个 `reviewCandidates` 常量并替换两处内联列表——如果你也在改这个文件，冲突只会在那一行附近。** | — | — |
 | 2 | 未知算子（`unsupported`）在 `renderStack` 里的行为是否已测？ | 对方 | 我看到 `renderOrder` 排除它，但没找到专门测试 |
 
 ---

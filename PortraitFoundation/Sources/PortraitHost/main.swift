@@ -53,6 +53,28 @@ struct PortraitHost {
         return result
     }
 
+    /// The three candidates `--review` renders, as (name, strength, texturePreservation).
+    ///
+    /// Defined once: this list used to be written out twice, in the MCP-driven pass and in the
+    /// direct-render pass, which is a standing invitation for the two to drift apart.
+    ///
+    /// The centre of the range is the level the user chose on a real photograph. They picked
+    /// strength 0.65 / texture 0.30 out of a sweep on `20261005.jpg` and said explicitly that
+    /// men should be smoothed less than this — 0.10 and 0.00 read as overdone. The previous
+    /// set (0.30/0.85, 0.50/0.70, 0.65/0.55) sampled only the gentlest end, which made the
+    /// comparison uninformative: all three looked nearly the same in the contact sheet.
+    ///
+    /// The spread is deliberately wide enough to include a clearly-too-gentle and a
+    /// clearly-too-strong option, so that a person looking at the sheet has something to
+    /// reject at each end. One photograph sets a default, not a rule; see
+    /// `SKILL-portrait-retouch.md`, which still needs samples across skin tones, lighting and
+    /// gender before its table can be called calibrated.
+    static let reviewCandidates: [(String, Double, Double)] = [
+        ("conservative", 0.35, 0.60),
+        ("standard", 0.65, 0.30),
+        ("strong", 0.75, 0.12),
+    ]
+
     static func review(_ photo: LoadedPhoto, source: URL, session: PortraitSession, server: MCPServer, directory: URL) async throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         _ = try await send(server, method: "initialize", params: .object([
@@ -79,7 +101,7 @@ struct PortraitHost {
         }
         try PhotoIO.encode(PhotoIO.image(overlay, width: photo.image.width, height: photo.image.height))
             .write(to: directory.appendingPathComponent("mask-overlay.png"), options: .atomic)
-        for (name, strength, texture) in [("conservative", 0.3, 0.85), ("standard", 0.5, 0.7), ("strong", 0.65, 0.55)] {
+        for (name, strength, texture) in reviewCandidates {
             let stack = JSONValue.array([.object(["kind": .object(["skin": .object([
                 "strength": .double(strength), "texturePreservation": .double(texture), "radius": .int(12)
             ])])])])
@@ -115,7 +137,7 @@ struct PortraitHost {
             var panels = [crop]
             var metrics: [JSONValue] = []
             let coverage = try PhotoIO.bytes(croppedAnalysis.skinMask), before = try PhotoIO.bytes(crop)
-            for (name, strength, texture) in [("conservative", 0.3, 0.85), ("standard", 0.5, 0.7), ("strong", 0.65, 0.55)] {
+            for (name, strength, texture) in reviewCandidates {
                 var params = SkinParams(); params.strength = strength; params.texturePreservation = texture
                 let result = try PortraitRenderer().renderStep(.skin(params), input: crop,
                     context: RenderContext(scale: .full, assets: [:], faces: croppedAnalysis.faces, skinMask: croppedAnalysis.skinMask))

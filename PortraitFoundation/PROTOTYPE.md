@@ -21,7 +21,7 @@ not presets validated across different people. Do not combine `--review` with an
 
 The initial real-photo test uses `0229_95_1.jpg`, 7008×4672, stored outside the repository.
 One face was detected. Its native 892×892 crop retained 96.3%, 85.4%, 70.6% Laplacian
-energy for strength/texture pairs 0.30/0.85, 0.50/0.70, 0.65/0.55. The measure uses red
+energy for strength/texture pairs 0.30/0.85, 0.50/0.70, 0.65/0.55. (Those were the candidates at the time. The set has since been re-centred on the level chosen from a later photograph; see `PortraitHost.reviewCandidates`.) (Those were the candidates at the time. The set has since been re-centred on the level chosen from a later photograph; see `PortraitHost.reviewCandidates`.) The measure uses red
 channel Laplacians entirely inside high coverage; it does not label all image variation
 as skin texture. Zero-coverage pixels changed in none of the candidates.
 
