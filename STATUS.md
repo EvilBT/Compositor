@@ -1,5 +1,13 @@
 # 项目状态
 
+最新进度（2026-10-06，T2 / `334c224`）：并发挂起已定位并修复。恢复 MCP suite 并发后复现，sample 显示8个 cooperative 工作线程阻塞在 Vision 同步 perform（FaceAnalyzer.swift:58），等待 VNControlledCapacityTasksQueue；这次挂起不是票据耗尽或 NSFileCoordinator。PortraitSession 现使用每会话独立串行 GCD SerialExecutor，把阻塞框架处理移出 cooperative pool，保持 actor 隔离和同步提交不重入。未修改图像算法、模型格式或 processVersion。
+
+已去掉 MCPTests 的 serialized；新增16独立会话并发 Vision、批准/保存、重开像素一致与撤销回归。Debug、Release各46项（16 Core / 15 Render / 2 Analysis / 13 MCP）通过，iOS arm64编译通过，核心target零AppKit/UIKit，既有skin指纹通过。并发回归 Debug 0.308秒 / Release 0.322秒，包含全部会话流程，不是单张渲染性能。没有加超时或重试。
+
+复现证据 `/tmp/portrait-t2-before-sample.txt`；修复验证命令为 `swift test --package-path PortraitFoundation --scratch-path /tmp/portrait-t2-debug`、Release加`-c release`、iOS使用任务书指定triple/sdk。日志分别 `/tmp/portrait-t2-debug.log`、`/tmp/portrait-t2-release.log`、`/tmp/portrait-t2-ios.log`。裸FaceAnalyzer同步API仍要求调用方选择适合阻塞操作的执行上下文；本轮修复覆盖全部PortraitSession入口。应用已更新，重启生效。本轮没有重新自动操作UI，事务/取消等既有回归保持通过。用户要求暂不远端同步；下一条是 T3 斑点检测，尚未认领。
+
+以下为前轮历史记录：
+
 最新进度（2026-10-06，T1 / `b25f38a`）：裸 SwiftPM 启动已修复，PortraitAppDelegate 初始化时设置 regular 激活策略，启动完成激活窗口；仅修改代理，不修改窗口内容或增加打包脚本。可复现：`PORTRAIT_STARTUP_DIAGNOSTICS=1 swift run -c release --package-path PortraitFoundation portrait-mac`，诊断记录 `visibleWindows=1; titles=["人像修图 · 原型"]`。osascript 验证因系统辅助访问权限拒绝未执行成功；应用自身诊断代替窗口计数，bundle 使用 CUA 独立核查1个窗口。
 
 最终代码 Debug 与 Release 各45项通过；iOS arm64编译通过；三个核心 target 零 AppKit/UIKit；未改渲染算法，指纹测试保持通过。bundle 用真实照片生成候选→退出确认→取消退出保留候选实测通过。应用已更新 `/Users/xiaoman/Developer/assets/PortraitPrototype.app`。下一条为 T2 并发等待根因；当前仍保留 serialized，未在T1中改动。按用户既有要求暂不 fetch/push。
