@@ -26,7 +26,7 @@
 
 | 编号 | 任务 | 优先级 | 状态 |
 |---|---|---|---|
-| T1 | 让 `swift run portrait-mac` 出窗口 | P0 | ⬜ 待认领 |
+| T1 | 让 `swift run portrait-mac` 出窗口 | P0 | ✅ `b25f38a` 已完成 |
 | T2 | 根治 MCP 测试套件的并发等待 | P0 | ⬜ 待认领 |
 | T3 | 斑点检测 | P1 | ⬜ 待认领 |
 | T4 | `.blemish` 算子渲染 | P1 | ⬜ 待认领 |
@@ -55,6 +55,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| `b25f38a` | T1：提前设置 regular 激活策略。裸 swift run 自身诊断 1 个可见窗口、正确标题；bundle CUA 1 个窗口，退出确认/取消保留候选通过。Debug/Release 各45、iOS编译通过。osascript 被辅助访问权限拒绝，使用启动诊断替代；按用户要求不远端同步 |
 | `c7a3266`…`3eeaac9` | **对方完成**：MCP schema/错误信息修复、原生 Mac 批准 UI（`PortraitMac`，387 行）、原尺寸 PNG 导出、保存/重开/退出保护、处理阶段状态与取消 |
 | （本次复核） | 我方独立验证对方这 8 个提交：45 项测试 Debug+Release 通过、iOS 仍可编译、Mac UI 实机起窗。**发现一个新问题，见第五节第 6 条** |
 | 本轮取消提交 | 全尺寸导出/检查阶段状态及取消；Release 45 项通过，预取消及阶段回调取消都不出文件、不改 revision。仅阶段边界取消，单次渲染/编码不可内部中断；真实 UI 取消本轮未自动化验证 |
@@ -84,7 +85,7 @@
 | iOS arm64 能编译，**含 MCP 可执行文件** | `swift build --triple arm64-apple-ios18.0 ...` |
 | 核心 target 不引入 AppKit/UIKit；独立 `PortraitMac` 使用 AppKit/SwiftUI | 历史检查覆盖旧 Sources；本轮源码核查 UI import 只在新增 Mac target |
 | **`swift build` 默认是 Debug（`-Onone`）** | 同一渲染 Debug 5058 ms vs Release 372 ms。**报性能数字前必须指定配置** |
-| **Mac UI 必须打成 `.app` bundle 才会出现窗口** | 裸可执行文件：Accessibility 查到 **0 个窗口**；同一二进制放进 `.app`：**1 个窗口**。`swift run portrait-mac` 会静默什么都不显示 |
+| **T1 已修复裸 SwiftPM 启动**（旧版本需 bundle） | `PORTRAIT_STARTUP_DIAGNOSTICS=1 swift run -c release --package-path PortraitFoundation portrait-mac` 启动诊断 `visibleWindows=1`、标题正确；bundle CUA 也显示1个窗口。osascript 辅助权限拒绝，未用其复核 |
 
 ### 4.2 渲染契约
 

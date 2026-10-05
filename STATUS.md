@@ -1,5 +1,11 @@
 # 项目状态
 
+最新进度（2026-10-06，T1 / `b25f38a`）：裸 SwiftPM 启动已修复，PortraitAppDelegate 初始化时设置 regular 激活策略，启动完成激活窗口；仅修改代理，不修改窗口内容或增加打包脚本。可复现：`PORTRAIT_STARTUP_DIAGNOSTICS=1 swift run -c release --package-path PortraitFoundation portrait-mac`，诊断记录 `visibleWindows=1; titles=["人像修图 · 原型"]`。osascript 验证因系统辅助访问权限拒绝未执行成功；应用自身诊断代替窗口计数，bundle 使用 CUA 独立核查1个窗口。
+
+最终代码 Debug 与 Release 各45项通过；iOS arm64编译通过；三个核心 target 零 AppKit/UIKit；未改渲染算法，指纹测试保持通过。bundle 用真实照片生成候选→退出确认→取消退出保留候选实测通过。应用已更新 `/Users/xiaoman/Developer/assets/PortraitPrototype.app`。下一条为 T2 并发等待根因；当前仍保留 serialized，未在T1中改动。按用户既有要求暂不 fetch/push。
+
+以下保留前轮历史记录：
+
 最新进度（2026-10-06）：全尺寸导出和原生细节检查增加真实阶段提示（核对源、读取像素、准备覆盖、渲染、PNG 编码、写入），Mac 提供取消处理按钮；保存、批准、撤销不开放取消。Task 取消在阶段边界检查，未完成的导出不写入目标文件，已批准状态保持不变。单次渲染和 ImageIO 编码尚不支持内部中断，点击取消可能需要等待当前阶段结束；已完成文件写入不会被当作取消撤回。没有伪百分比。
 
 Release 构建与 45 项测试通过（16 Core / 15 Render / 2 Analysis / 12 MCP）。新增预取消检查及扩展 nativeExport 验证阶段回调中取消后抛 CancellationError、没有输出文件、revision 不变。本轮未重新执行真实全尺寸导出，也未自动点击真实 UI 取消按钮；阶段/取消语义由协议外会话回归验证。更新应用在 `/Users/xiaoman/Developer/assets/PortraitPrototype.app`，重启生效；远端同步继续跳过。
