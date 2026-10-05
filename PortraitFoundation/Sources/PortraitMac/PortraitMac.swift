@@ -2,6 +2,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import RetouchKit
 import PortraitCore
 import PortraitMCP
 
@@ -298,6 +299,29 @@ struct NativeDetailView: View {
     @Environment(\.displayScale) private var displayScale
     @State private var selectedFace = -1
     @State private var zoom = 1.0
+    @State private var mode = ComparisonMode.split
+    @State private var split = 0.5
+    @State private var comparison: ImageComparison?
+    @State private var comparisonError: String?
+
+    private enum ComparisonMode: String, CaseIterable, Identifiable {
+        case sideBySide, split, overlay, difference
+        var id: Self { self }
+        var title: String {
+            switch self {
+            case .sideBySide: "并排"
+            case .split: "分割滑动"
+            case .overlay: "修改区域"
+            case .difference: "差值 ×4"
+            }
+        }
+    }
+    private struct ComparisonSource: @unchecked Sendable { let before: CGImage; let after: CGImage }
+
+    init(inspection: NativeInspection) {
+        self.inspection = inspection
+        _selectedFace = State(initialValue: inspection.faces.isEmpty ? -1 : 0)
+    }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -315,17 +339,95 @@ struct NativeDetailView: View {
                 }.frame(width: 150)
                 Button("完成") { dismiss() }
             }
+            Picker("比较方式", selection: $mode) {
+                ForEach(ComparisonMode.allCases) { Text($0.title).tag($0) }
+            }.pickerStyle(.segmented)
+            Text(legend)
+                .font(.caption).foregroundStyle(.secondary)
             Text("100% 时一张照片像素对应一个屏幕像素。这里显示已批准结果，未批准候选不参与。")
                 .font(.caption).foregroundStyle(.secondary)
             ScrollView([.horizontal, .vertical]) {
-                HStack(alignment: .top, spacing: 16) {
-                    detail("原图", image: inspection.original)
-                    detail("已批准效果", image: inspection.approved)
+                Group {
+                    switch mode {
+                    case .sideBySide:
+                        HStack(alignment: .top, spacing: 16) {
+                            detail("原图", image: inspection.original)
+                            detail("已批准效果", image: inspection.approved)
+                        }
+                    case .split: splitComparison
+                    case .overlay, .difference:
+                        if let comparison {
+                            diagnosticImage(mode == .overlay ? comparison.changedOverlay : comparison.difference)
+                        } else {
+                            ProgressView(comparisonError ?? "正在计算像素差值…").padding(30)
+                        }
+                    }
                 }.padding(8)
             }.background(Color.black.opacity(0.9))
         }
         .padding(20).frame(width: 1080, height: 720)
-        .onAppear { if !inspection.faces.isEmpty { selectedFace = 0 } }
+        .task(id: selectedFace) {
+            comparison = nil
+            comparisonError = nil
+            let source = ComparisonSource(before: cropped(inspection.original), after: cropped(inspection.approved))
+            do {
+                let result = try await Task.detached(priority: .userInitiated) {
+                    try ImageComparison.make(original: source.before, processed: source.after)
+                }.value
+                guard !Task.isCancelled else { return }
+                comparison = result
+            } catch { if !Task.isCancelled { comparisonError = String(describing: error) } }
+        }
+    }
+
+    private var legend: String {
+        switch mode {
+        case .sideBySide: return "左右为相同区域；可同时滚动检查。"
+        case .split: return "拖动白色分割线：左侧原图，右侧已批准效果。"
+        case .overlay:
+            if let comparison {
+                return "品红覆盖实际改变的像素（零阈值），不是皮肤遮罩。改动 \(comparison.changedPixels) / \(comparison.totalPixels) 像素。"
+            }
+            return "品红覆盖实际改变的像素，不改变成片。"
+        case .difference: return "黑色代表未变化；逐通道绝对差值放大 4 倍，仅用于观察。"
+        }
+    }
+
+    private func diagnosticImage(_ image: CGImage) -> some View {
+        Image(decorative: image, scale: displayScale).resizable().interpolation(.none)
+            .frame(width: Double(image.width) * zoom / displayScale,
+                   height: Double(image.height) * zoom / displayScale)
+    }
+
+    private var splitComparison: some View {
+        let before = cropped(inspection.original), after = cropped(inspection.approved)
+        let width = Double(before.width) * zoom / displayScale
+        let height = Double(before.height) * zoom / displayScale
+        return ZStack(alignment: .leading) {
+            diagnosticImage(after)
+            diagnosticImage(before).mask(alignment: .leading) {
+                Rectangle().frame(width: width * split, height: height)
+            }
+            Rectangle().fill(.white).frame(width: 2).offset(x: width * split - 1)
+            Image(systemName: "arrow.left.and.right").padding(8)
+                .background(.black.opacity(0.7), in: Circle()).foregroundStyle(.white)
+                .frame(width: 36, height: 36)
+                .offset(x: width * split - 18)
+        }
+        .frame(width: width, height: height)
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+            split = min(1, max(0, value.location.x / width))
+        })
+        .accessibilityLabel("原图与已批准效果分割位置")
+        .accessibilityValue("\(Int(split * 100))%")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: split = min(1, split + 0.05)
+            case .decrement: split = max(0, split - 0.05)
+            @unknown default: break
+            }
+        }
     }
 
     private func detail(_ title: String, image: CGImage) -> some View {

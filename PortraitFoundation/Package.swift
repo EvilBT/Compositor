@@ -11,7 +11,7 @@ var clientProducts: [Product] = []
 var clientTargets: [Target] = []
 #if os(macOS)
 clientProducts.append(.executable(name: "portrait-mac", targets: ["PortraitMac"]))
-clientTargets.append(.executableTarget(name: "PortraitMac", dependencies: ["PortraitMCP", "PortraitCore"]))
+clientTargets.append(.executableTarget(name: "PortraitMac", dependencies: ["PortraitMCP", "PortraitCore", "RetouchKit"]))
 #endif
 
 let package = Package(
