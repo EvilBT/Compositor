@@ -2,10 +2,29 @@
 
 Compositor is a macOS image editor for compositing and photo work, written in Swift (SwiftUI and AppKit, with some C for pixel work).
 
+## Read this first: another agent is working in this repository
+
+**More than one AI works on this checkout at the same time.** Read [SYNC.md](SYNC.md) before
+touching anything, and update it before you stop. It is the coordination board: who is editing
+what right now, what has been verified and how, which traps are already known, and which
+decisions the user has already made so you do not ask twice.
+
+The four rules that keep two agents from destroying each other's work:
+
+1. `git fetch origin && git status` first. Read SYNC.md's "正在做" and "待对方回答" sections.
+2. **Register what you are about to edit** in SYNC.md before you edit it. Two agents editing one
+   file is a guaranteed conflict.
+3. **Push often.** Uncommitted work is invisible to the other agent. Never `checkout`, `reset` or
+   `stash` over changes you did not make.
+4. Before stopping: move your claim to "刚完成", add anything you verified to "已核实的事实",
+   and leave questions for the other agent in "待对方回答".
+
 ## Project status
 
-- Before starting work, read [STATUS.md](STATUS.md) for current progress, known issues, and next steps. Check its claims against the code when relevant.
-- Before finishing, update `STATUS.md` with actual progress, validation results, remaining issues, and next steps. Keep completed work distinct from plans and unverified claims.
+- [STATUS.md](STATUS.md) is the long-form history: what has been built, what was verified, what
+  remains. Read it for context; check its claims against the code when they matter.
+- Before finishing, update `STATUS.md` with actual progress, validation results, remaining issues,
+  and next steps. Keep completed work distinct from plans and unverified claims.
 
 ## Designing or editing a Compositor project
 
