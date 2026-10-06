@@ -302,7 +302,7 @@ catch { return response(id: idValue, result: .object([
 
 ### 3. ⚠️ **坐标系没有说明**（具体缺陷）
 
-`AnchoredPoint` 的三种 space **全部是归一化 0–1**：
+`AnchoredPoint` 的 image / face space 是归一化 0–1；landmark 是**有符号的人脸宽度分数偏移**：
 
 ```swift
 case image                     // Normalized 0–1 across the whole image
@@ -351,3 +351,24 @@ case landmark(faceIndex:landmark:)  // face-width fractions
   我们的 `render_preview_with` 是同一角色，值得把这条纪律写进 instructions。
 - **`Action Plan` 模式**：一次规划调用产生有序工具列表再执行，减少往返。
   这与"AI 提议 → 人确认 → 应用"的流程同构，可作参考。
+
+
+## T12 实现核查（2026-10-06）
+
+原始instructions只给源尺寸，未说明坐标单位；文字本身没有两次pixel，此前复审描述不精确。
+独立原生探针实际传入image `[3000,2000]`，旧document.validate接受；补校验后抛
+`outOfRange(op: "blemish", field: "spots[0].at.value.x", value: 3000, range: 0...1)`。
+现有MCP StackCodec尚不接受blemish/localAdjustment，所以同一像素请求原来已返回
+`unsupportedOperation`，不会提交或写文档；不是当前可用MCP工具已经静默渲染错位置。
+
+现在统一校验斑点目标、复制源、局部区域中心及路径点：image/face为有限0...1；
+landmark为有限、有符号、无硬范围的人脸宽度分数，原点在landmark，两个轴均按脸宽换算。
+负偏移和超过一脸宽的偏移允许，避免拒绝跨脸边界/图外区域的合法表达；不能将它们当像素。
+该宽松点不自动推断单位，也不会把大数自动缩成0...1。未来开放带坐标工具时仍须遵守契约。
+拓展半径、extent和其他参数校验不属于本次T12。未知算子继续原样保留，文件结构未改。
+
+T11对照的设计方向接受：类型化错误/可操作恢复提示、能力单一来源、方法论prompt。
+优先维持现有三个工具，用单一能力来源满足11d，不复制Photoshop传输层。
+恢复建议必须按本项目事务判定；session_id格式错误应由客户端生成合法UUID，
+不是要求重做预览（preview不提供session_id），不能照搬复审例子。
+本次不实施T11，也未独立核实参考项目工具数量；后续按具体需求复核。

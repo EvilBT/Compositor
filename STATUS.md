@@ -1,5 +1,15 @@
 # 项目状态
 
+最新进度（2026-10-06，T12）：先读最新同步板，T8由复核方独立8/8验收，原待验收请求已关闭。按插队要求完成坐标说明与校验。实际原生探针image `[3000,2000]`旧validate接受，新validate抛outOfRange，字段spots[0].at.value.x，范围0...1。MCP独立客户端前后同一blemish像素请求均unsupportedOperation且未写文档：当前StackCodec未开放带锚点算子，并非当前MCP已经静默渲染错位。
+
+统一验证blemish目标/复制源和localAdjustment的中心/路径点。image/face有限0...1；landmark为有符号的人脸宽度分数，负值和超过1允许，仅拒绝非有限值，以保留跨边界/图外的合法表达。不能按0...1一刀切，也不自动猜测像素。已补initialize契约：参照系、左上原点/y向下、两轴脸宽偏移、skin.radius像素和spot.radius脸宽分数。未知算子不改，编码格式/processVersion/渲染算法均未改。
+
+Debug/Release各55项（Core19/Render18/Analysis2/MCP13/Mac3）通过，iOS编译通过，核心无AppKit/UIKit，既有v1/v2字节指纹通过。新增3项坐标回归及初始化说明断言。日志/tmp/portrait-t12-debug.log、/tmp/portrait-t12-release.log、/tmp/portrait-t12-ios.log；独立协议前后日志/tmp/portrait-t12-protocol-before.log、/tmp/portrait-t12-protocol-after.log；原生探针新结果/tmp/portrait-t12-core-after.log。照片未改/上传，临时文档未产生。Swift scratch和临时探针/客户端将清理，日志保留。
+
+已读T11复审，接受结构化错误、说明契约、单一能力来源和方法论prompt方向，保留三工具且不复制桥；修正其session_id错误建议，合法UUID应由客户端生成，不必重做preview（preview不提供session_id）。本轮不实现T11。下一任务T3，未认领；按用户既有要求不fetch/push。
+
+以下为历史记录：
+
 最新进度（2026-10-06，T8实现 / 6a23f3f）：文件及URL入口接入有效图片检查和allowDiscard；应用代理持有会话，避免场景重建丢失编辑。退出堆栈来自AppKit末窗口关闭自动退出；增加保留进程和文件入口恢复窗口。关闭窗口后进程保留，Cmd-Q仍走原确认。未改渲染/文档版本。
 
 Debug/Release各52项（既有49+Mac3项）、iOS编译通过，核心无AppKit/UIKit，v1/v2指纹通过。日志/tmp/portrait-t8-debug.log、/tmp/portrait-t8-release.log、/tmp/portrait-t8-ios.log。独立唯一测试实例真实open载入照片，AX标题证实；非图片提示且原照片保持；候选换图取消保留候选，批准未保存后换图取消保留编辑及撤销，Cmd-Q原确认通过。用户源照片及编辑未写，用户运行的应用未动。

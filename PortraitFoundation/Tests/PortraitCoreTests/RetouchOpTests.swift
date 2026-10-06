@@ -212,6 +212,58 @@ struct AgentProvenanceTests {
 @Suite("Validation")
 struct ValidationTests {
 
+    @Test("Normalized image and face anchors reject pixels, negative positions and nonfinite values")
+    func normalizedAnchorsRejectInvalidUnits() throws {
+        for space: AnchoredPoint.Space in [.image, .face(index: 0)] {
+            for value in [SIMD2<Double>(3000, 2000), SIMD2(-0.01, 0.5),
+                          SIMD2(0.5, 1.01), SIMD2(.nan, 0.5), SIMD2(0.5, .infinity)] {
+                var params = BlemishParams()
+                params.spots = [.init(at: AnchoredPoint(space: space, value: value), radius: 0.01)]
+                #expect(throws: RetouchError.self) {
+                    try sampleDocument(ops: [RetouchOp(kind: .blemish(params))]).validate()
+                }
+            }
+            for value in [SIMD2<Double>(0, 0), SIMD2(1, 1)] {
+                var params = BlemishParams()
+                params.spots = [.init(at: AnchoredPoint(space: space, value: value), radius: 0.01)]
+                try sampleDocument(ops: [RetouchOp(kind: .blemish(params))]).validate()
+            }
+        }
+    }
+
+    @Test("Heal source and all anchored region shapes enforce normalized coordinates")
+    func sourcesAndRegionsRejectPixelCoordinates() {
+        let bad = AnchoredPoint(space: .image, value: SIMD2(3000, 2000))
+        var params = BlemishParams()
+        params.spots = [.init(at: .near(.cheekLeft), source: bad, radius: 0.01)]
+        #expect(throws: RetouchError.self) {
+            try sampleDocument(ops: [RetouchOp(kind: .blemish(params))]).validate()
+        }
+        for region: RegionShape in [.ellipse(center: bad, radius: SIMD2(0.1, 0.1)),
+                                    .rectangle(center: bad, halfExtent: SIMD2(0.1, 0.1)),
+                                    .path(points: [.near(.cheekLeft), bad], closed: true)] {
+            #expect(throws: RetouchError.self) {
+                try sampleDocument(ops: [RetouchOp(kind: .localAdjustment(LocalAdjustmentParams(region: region)))]).validate()
+            }
+        }
+    }
+
+    @Test("Landmark offsets preserve signed fractions beyond one face width but refuse nonfinite values")
+    func landmarkOffsetsRemainSignedAndUnbounded() throws {
+        var params = BlemishParams()
+        params.spots = [.init(at: .near(.cheekLeft, dx: -0.1, dy: 1.2), radius: 0.01)]
+        let document = sampleDocument(ops: [RetouchOp(kind: .blemish(params))])
+        let decoded = try JSONDecoder().decode(PortraitDocument.self, from: JSONEncoder().encode(document))
+        #expect(decoded.ops == document.ops)
+        try decoded.validate()
+        for value in [Double.nan, .infinity, -.infinity] {
+            params.spots[0].at.value.x = value
+            #expect(throws: RetouchError.self) {
+                try sampleDocument(ops: [RetouchOp(kind: .blemish(params))]).validate()
+            }
+        }
+    }
+
     @Test("An out-of-range value is refused with the range, not silently clamped")
     func outOfRangeIsRefused() throws {
         var params = SkinParams()

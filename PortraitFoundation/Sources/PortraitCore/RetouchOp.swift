@@ -952,6 +952,36 @@ public extension RetouchOpKind {
             }
         }
 
+        func checkAnchor(_ point: AnchoredPoint, op: String, field: String) throws {
+            switch point.space {
+            case .image:
+                try check(op, field + ".value.x", point.value.x, 0...1)
+                try check(op, field + ".value.y", point.value.y, 0...1)
+            case .face(let index):
+                try checkFace(index)
+                try check(op, field + ".value.x", point.value.x, 0...1)
+                try check(op, field + ".value.y", point.value.y, 0...1)
+            case .landmark(let index, _):
+                try checkFace(index)
+                // Offsets can be negative or extend beyond one face width; bounds would
+                // reject valid regions extending beyond a face or outside the image.
+                guard point.value.x.isFinite, point.value.y.isFinite else {
+                    throw RetouchError.invalidRegion(field + " must contain finite landmark offsets in face-width fractions")
+                }
+            }
+        }
+        func checkRegion(_ region: RegionShape) throws {
+            switch region {
+            case .ellipse(let center, _), .rectangle(let center, _):
+                try checkAnchor(center, op: "localAdjustment", field: "region.center")
+            case .path(let points, _):
+                for (index, point) in points.enumerated() {
+                    try checkAnchor(point, op: "localAdjustment", field: "region.points[\(index)]")
+                }
+            case .painted(let asset): try checkAsset(asset)
+            }
+        }
+
         switch self {
         case .tone(let p):
             try check("tone", "exposure", p.exposure, -5...5)
@@ -969,12 +999,14 @@ public extension RetouchOpKind {
 
         case .blemish(let p):
             try check("blemish", "detectionThreshold", p.detectionThreshold, 0...1)
-            for spot in p.spots {
+            for (index, spot) in p.spots.enumerated() {
                 try check("blemish", "radius", spot.radius, 0.001...0.2)
                 try check("blemish", "hardness", spot.hardness, 0...1)
                 try check("blemish", "opacity", spot.opacity, 0...1)
-                if case .landmark(let face, _) = spot.at.space { try checkFace(face) }
-                if case .face(let face) = spot.at.space { try checkFace(face) }
+                try checkAnchor(spot.at, op: "blemish", field: "spots[\(index)].at")
+                if let source = spot.source {
+                    try checkAnchor(source, op: "blemish", field: "spots[\(index)].source")
+                }
             }
 
         case .reshape(let p):
@@ -1011,7 +1043,7 @@ public extension RetouchOpKind {
         case .localAdjustment(let p):
             try check("localAdjustment", "feather", p.feather, 0...1)
             try check("localAdjustment", "opacity", p.opacity, 0...1)
-            if case .painted(let asset) = p.region { try checkAsset(asset) }
+            try checkRegion(p.region)
 
         case .grain(let p):
             try check("grain", "amount", p.amount, 0...100)

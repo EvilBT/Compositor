@@ -28,6 +28,12 @@ struct MCPTests {
             "protocolVersion": .string("2025-06-18"), "capabilities": .object([:]),
             "clientInfo": .object(["name": .string("test"), "version": .string("1")])]))
         #expect(initialized?.objectValue?["result"]?.objectValue?["protocolVersion"] == .string("2025-06-18"))
+        let instructions = try #require(initialized?.objectValue?["result"]?.objectValue?["instructions"]?.stringValue)
+        for contract in ["normalized 0...1", "top-left", "detected face bounding box",
+                         "signed finite offsets", "face-width fractions", "negative values are valid",
+                         "skin.radius is full-resolution pixels", "not yet exposed"] {
+            #expect(instructions.contains(contract))
+        }
         #expect(try await rpc(server, "notifications/initialized", id: nil) == nil)
         let tools = try await rpc(server, "tools/list")
         #expect(tools?.objectValue?["result"]?.objectValue?["tools"]?.arrayValue?.count == 3)
