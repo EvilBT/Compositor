@@ -515,3 +515,8 @@ python3 scripts/i18n/missing.py
 ### SAM 3 / 3.1 纳入比较（2026-10-06）
 
 用户要求已登记为独立候选，比较方案见 `scripts/face-parsing/sam3-comparison.md`。核实官方3.1为Object Multiplex视频追踪权重，图片builder仍默认SAM3；不可把SAM3图片输出标成3.1。两官方HF仓库gated=manual，匿名权重HEAD均401，因此本轮没有取得权重、没有推理效果或CPU/MPS性能结论。固定两张本地照片、文字/示例/相同12探针、无饰物负例、保护核心与皮肤外零变化检查已列入方案。下一步需获准的本地权重，再验证加载完整性和本机兼容性。本轮仅文档及官方资源可用性检查，未改Swift/App，未重跑Swift测试；远端同步继续按用户要求跳过。
+
+
+### HF优化SAM候选调研（2026-10-06）
+
+已查发布方模型卡、LiteText论文和HF API。MLX社区sam3-bf16/sam3.1-bf16/sam3-8bit均ungated，匿名权重HEAD200，纠正上一轮仅官方权重导致的访问阻碍：可走社区Apple Silicon转换途径，但尚未下载/推理/核实转换一致性。优先同MLX运行时SAM3与3.1，再测8bit内存与小目标退化；EfficientSAM3/LiteText为轻量化候选，不是贴钻精度冠军。CoreML3.1候选仅backbone+tracker；Embedl偏TensorRT且发布方cgF1较自身FP32下降。模型清单、修订及限制已写sam3-comparison.md。未改Swift/App，未运行Swift测试，本轮只资料和可用性检查。
