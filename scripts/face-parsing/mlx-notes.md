@@ -45,3 +45,5 @@ No smoothing or export is performed here. The outputs need face/skin restriction
 semantic acceptance and locked protection/feather validation before application use.
 
 Found runtime limitation: mlx-vlm0.7.6 SAM3.1 DetectorModel accepts boxes but does not use them. Exemplar output is invalid. Community sam3.1-bf16 actually stores F32 tensors; --cast-bf16 explicitly converts floating parameters in memory, preserving cached weights. Results: /Users/xiaoman/Developer/assets/face-parsing-trial/mlx-results.md.
+
+Automatic ROI/semantic restriction/confirmed protection follow-up: see mlx-protect-notes.md and local mlx-protection-results.md. The original comparison remains unchanged.
