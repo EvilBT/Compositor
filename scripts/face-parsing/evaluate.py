@@ -23,7 +23,11 @@ def main():
     ap = argparse.ArgumentParser()
     for name in ('photo', 'baseline', 'segface', 'facer', 'weights', 'output'):
         ap.add_argument('--'+name, type=Path, required=True)
+    ap.add_argument('--segformer', type=Path)
+    ap.add_argument('--crop-scale', type=float, default=1.65)
     args = ap.parse_args()
+    if not 1 <= args.crop_scale <= 3:
+        ap.error('crop-scale must be between 1 and 3')
     args.output.mkdir(parents=True, exist_ok=False)
     torch.set_num_threads(4)
     torch.manual_seed(0)
@@ -36,11 +40,11 @@ def main():
     for face in analysis['faces']:
         box = face['boundingBox']; x, y = box['origin']; w, h = box['size']
         cx, cy = (x+w/2)*photo.width, (y+h/2)*photo.height
-        side = max(w*photo.width, h*photo.height)*1.65
+        side = max(w*photo.width, h*photo.height)*args.crop_scale
         rect = (max(0,int(cx-side/2)),max(0,int(cy-side/2)),
                 min(photo.width,int(cx+side/2)),min(photo.height,int(cy+side/2)))
         rects.append(rect); crops.append(photo.crop(rect)); masks.append(baseline.crop(rect))
-    report = {'source_sha256': original_hash, 'source_size': photo.size, 'device': str(device),
+    report = {'source_sha256': original_hash, 'source_size': photo.size, 'device': str(device), 'crop_scale': args.crop_scale,
               'torch': torch.__version__, 'face_crops': rects, 'models': {},
               'note': 'Visual trial, no hand-labeled ground truth. Skin includes nose; neck/ears excluded. No beard class. Timing includes one cold inference, not loading.'}
     outputs = {'Original': crops, 'Current heuristic': [overlay(c,m/255,(235,40,200)) for c,m in zip(crops,map(np.asarray,masks))]}
@@ -107,6 +111,30 @@ def main():
         report['models']['FaRL']={'seconds_per_face_including_detection':timings,'checkpoint_sha256':hashlib.sha256((args.weights/'farl-celebm.pt').read_bytes()).hexdigest()}
     except Exception as e: report['models']['FaRL']={'error':repr(e)}
     print('FaRL',report['models']['FaRL'],flush=True)
+    if args.segformer:
+        try:
+            from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
+            processor=SegformerImageProcessor.from_pretrained(args.segformer,local_files_only=True)
+            model=SegformerForSemanticSegmentation.from_pretrained(args.segformer,local_files_only=True).eval().to(device)
+            names={str(v):int(k) for k,v in model.config.id2label.items()}
+            skin_ids=[names['skin'],names['nose']]; glasses_id=names['eye_g']; hair_id=names['hair']
+            result=[]; timings=[]
+            for i,crop in enumerate(crops):
+                inputs=processor(images=crop,return_tensors='pt').to(device)
+                start=time.perf_counter()
+                with torch.inference_mode():
+                    logits=model(**inputs).logits
+                    labels=F.interpolate(logits,size=(512,512),mode='bilinear',align_corners=False)[0].argmax(0).cpu().numpy().astype('uint8')
+                timings.append(time.perf_counter()-start)
+                save_labels(args.output,'SegFormer B5',i,labels)
+                labels=np.asarray(Image.fromarray(labels).resize(crop.size,Image.Resampling.NEAREST))
+                result.append(overlay(overlay(overlay(crop,np.isin(labels,skin_ids),(235,40,200)),labels==glasses_id,(0,230,255)),labels==hair_id,(255,185,0)))
+            outputs['SegFormer B5']=result
+            report['models']['SegFormer B5']={'seconds_per_face':timings,
+                'checkpoint_sha256':hashlib.sha256((args.segformer/'model.safetensors').read_bytes()).hexdigest(),
+                'label_names':model.config.id2label,'processor_size':dict(processor.size)}
+        except Exception as e: report['models']['SegFormer B5']={'error':repr(e)}
+        print('SegFormer B5',report['models']['SegFormer B5'],flush=True)
     font=ImageFont.truetype('/System/Library/Fonts/Supplemental/Arial.ttf',22)
     titles=list(outputs)
     for i in range(len(crops)):
