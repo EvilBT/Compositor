@@ -38,7 +38,8 @@ T6 遮罩覆盖（脖子/胸口/耳朵）      ← 独立
 T7 性别化强度（只做管道）          ← 独立
 ```
 
-**顺序建议：T1 → T2 → T8 → T3 → T4 → T5 → T10 → T6 → T7。**
+**顺序建议：T1 → T2 → T8 → T3 → T4 → T5 → T10 → T11 → T6 → T7。**
+（T11 中 **11a 坐标系**是正确性问题，可随时优先插入）
 （T9 降级为备用；用户已授权走 T10 的质量优先路线）
 T1、T2 都很小，先清掉，让用户马上能试用 UI。T3–T5 是一条链，是**当前最大的能力缺口**。
 
@@ -398,6 +399,71 @@ App 正在运行时，执行 `open -a PortraitMac.app 某张照片.jpg`，**App 
 
 **明确不做**：不继续扩大模型比较（`DECISION.md` 已收敛）；不改 `processVersion` 语义
 （这是遮罩生成的改进，不是算子语义变更——但若导致已保存文档渲染变化，必须 bump）
+
+---
+
+## T11 · 按 `photoshop-mcp` 的对照改进 MCP 工具面
+
+**优先级** P2　**规模** 中　**依赖** 无
+**依据**：`PortraitFoundation/MCP-TOOLS.md` 末尾的对照复审
+
+参考对象 MIT 许可，**读设计，不要抄传输层**（它必须跨进程桥，我们不需要）。
+
+### 11a. ⚠️ **先补坐标系说明**（正确性问题，不只是文档）
+
+`AnchoredPoint` 的三种 space **全是归一化 0–1**，但 `initialize` 的 `instructions` 里
+**出现了两次 "pixel"（来自 `Source dimensions: 6240×4160`），却完全没提归一化**。
+
+**agent 会合理地传像素值。** 对照 `photoshop-mcp` 有专门的 Units 一节，明确"全部是像素，
+不要换算成英寸/厘米/百分比"——**它们写了，我们没写**。
+
+- [ ] `instructions` 里明确：坐标一律 **0–1 归一化**，并说明三种 space 各自的参照物
+- [ ] **确认 `AnchoredPoint` 是否有 0–1 范围校验**；若没有，传像素会**静默**产生错误结果——
+      应当拒绝或明确文档化
+- [ ] 加测试：越界坐标被拒绝（或明确记录为已知宽松点）
+
+### 11b. 结构化错误信封
+
+现在是 `{"isError": true, "content": [{"type":"text","text":"\(error)"}]}`——**只有一句话**。
+
+改成：`{ ok: false, code, message, suggested_next_tool?, suggested_args? }`
+
+- [ ] 定义错误码枚举（对照 `SkinRenderError` / `PortraitSessionError` / `PhotoIOError`）
+- [ ] 每个码给出 `suggested_next_tool`（例：`session_id` 非法 → 重新调 `render_preview_with` 拿票据）
+- [ ] 保留人类可读的 `message`（`84d87bf` 已经改好的那些句子不要丢）
+- [ ] 新增测试断言错误响应里含 `code` 与 `suggested_next_tool`
+
+### 11c. `instructions` 从一句话扩成契约
+
+- [ ] 工作流契约（分析 → 预览 → 人确认 → `set_stack`）
+- [ ] **坐标系与单位**（见 11a）
+- [ ] 错误码表
+- [ ] `render_preview_with` 的使用纪律：**每个主要步骤一次，不要每步都调**
+
+### 11d. 能力清单不要硬编码
+
+instructions 里写死了 "Only skin, tone, presence, whiteBalance and point toneCurve are implemented"，
+**这会和 `PortraitRenderer` 的 switch 漂移**。
+
+- [ ] 加一个 `get_capabilities` 工具，从 `PortraitRenderer` 实际支持的集合派生
+- [ ] 或至少让这份清单只有一个来源
+
+### 11e. 用 MCP `prompts` 暴露 `SKILL-portrait-retouch.md`
+
+`photoshop-mcp` 有 **23 个 prompt**（`prompts/list` / `prompts/get`）。
+我们**只用了 tools**，而 270 行的修图方法论现在是一个客户端得自己去找的文件。
+
+- [ ] 把 SKILL 的关键流程做成 MCP prompts（例如"保守修一张人像"、"判断强度"）
+- [ ] 保留 SKILL 作为唯一的文字来源，prompt 从它派生
+
+**验收标准**
+- [ ] 既有 52 项测试全过；新增覆盖 11a/11b 的断言
+- [ ] iOS 编译通过；核心 target 无 AppKit/UIKit
+- [ ] 用一个**独立客户端**（不要用仓库自带的脚本）实际走一遍：非法参数拿到 `code`、
+      按 `suggested_next_tool` 自我修复成功、`prompts/list` 能列出内容
+- [ ] `SYNC.md` 记录实测
+
+**明确不做**：不引入跨进程桥；不改现有的票据/revision 事务（那比参考实现更强）
 
 ---
 

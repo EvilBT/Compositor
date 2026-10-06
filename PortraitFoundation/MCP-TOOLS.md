@@ -246,3 +246,108 @@ Mac 端（AI 在跑）  ──写入──▶  RetouchOp 栈  ──同步──
 只要能跑通「AI 看图 → 提议 → 人确认 → 应用 → AI 再看图」，架构就验证了，**后面只是往表里加工具**。
 
 顺带说一句：`set_stack` 是可以先不做的。只做前两个 + 文件层面的栈读写，闭环就已经成立——这正好也是 Compositor 现在的 `writing-comp-files.md` 那条路。
+
+---
+
+# 附：与 `photoshop-mcp` 的对照复审（2026-10-06，复核方）
+
+参考对象：[alisaitteke/photoshop-mcp](https://github.com/alisaitteke/photoshop-mcp)，**MIT**，
+127 个工具（111 原子 + 16 recipe），23 个 MCP prompt。
+它**独立地**解出了和本项目相同的问题，因此是一次有价值的外部对照。
+
+**结论：它是很好的工具面参照，但传输层不要抄。**
+它必须跨进程桥（AppleScript/COM → ExtendScript，或 UXP 的 HTTP 轮询）才能驱动 Photoshop；
+**本项目不需要桥**，因为 `RetouchOp` 是可序列化数据。这条优势在本文件开头已经写明，此处得到外部印证。
+
+## 它做得好、值得我们学的四处
+
+### 1. 结构化错误信封（**最高价值**）
+
+它的形状：
+
+```ts
+interface PhotoshopErrorEnvelope {
+  ok: false
+  code: PhotoshopErrorCode          // 24 个类型化错误码
+  message: string
+  suggested_next_tool?: string      // ← 让 agent 能自我修复
+  suggested_args?: Record<string, unknown>
+}
+```
+
+并且有一张**模式表**把底层字符串错误映射到 `(code, suggested_next_tool)`——
+这正好对应我们的处境：底层抛的是 `SkinRenderError` / `PortraitSessionError`，目前被 `"\(error)"` 拍平。
+
+**我们现在的样子**（`MCPServer.swift`）：
+
+```swift
+catch { return response(id: idValue, result: .object([
+    "isError": .bool(true), "content": .array([Self.text("\(error)")])
+])) }
+```
+
+**只有一句人类可读的话，没有机器可读的 code，也没有下一步提示。**
+
+对照 `84d87bf` 刚做的改进：`session_id must be a UUID string.` 已经比 `previewMismatch` 好得多，
+但**它仍然只是一句话**。加 `code` 与 `suggested_next_tool` 才是下一级。
+
+### 2. `instructions` 是一份**契约**，不是一句话
+
+它是分节的：HARD RULE / Session bootstrap / State before action / Recipe over atomic /
+**Units & conventions** / **Error recovery contract**（含错误码表）。
+
+我们现在是**一整句**：
+
+> `Open photo_id: … Source dimensions: 6240×4160. Analyze first, render a candidate, obtain human confirmation, then set_stack with that preview_id and expected_revision. Only skin, tone, presence, whiteBalance and point toneCurve are implemented. This host is a preview prototype.`
+
+### 3. ⚠️ **坐标系没有说明**（具体缺陷）
+
+`AnchoredPoint` 的三种 space **全部是归一化 0–1**：
+
+```swift
+case image                     // Normalized 0–1 across the whole image
+case face(index: Int)          // Normalized 0–1 across a detected face's bounding box
+case landmark(faceIndex:landmark:)  // face-width fractions
+```
+
+**但 instructions 里出现了两次 "pixel"**（来自 `Source dimensions: 6240×4160`），
+**却一个字都没提归一化**。agent 读到尺寸后合理地传 `{"value":[3000,2000]}`，拿到的就是错的结果。
+
+对照 `photoshop-mcp` 的 Units 一节：
+
+> All numeric coordinates, widths, heights and bounds are pixels.
+> **The server forces pixel/point units around every script — do not translate to inches/cm/percent.**
+
+**它们的单位是像素并明说了；我们的单位是归一化却没写。** 这是必须补的。
+
+（待确认：`AnchoredPoint` 的值是否有 0–1 范围校验。若没有，传像素会**静默**产生错误结果。）
+
+### 4. 没有用 MCP 的 `prompts` 原语
+
+它有 **23 个 prompt**（`prompts/list`、`prompts/get`），把"怎么修图"的方法论直接下发给宿主。
+**我们只有 tools**，而 `SKILL-portrait-retouch.md`（270 行方法论）目前是一个客户端得自己去找的文件。
+
+**把 SKILL 通过 MCP `prompts` 暴露，是天然对应。**
+
+### 5. 能力清单硬编码在字符串里
+
+我们的 instructions 里写死了 "Only skin, tone, presence, whiteBalance and point toneCurve are implemented"。
+**这句话会和 `PortraitRenderer` 的 switch 漂移。**
+`photoshop-mcp` 的做法是提供一个 `get_capabilities` 工具，让宿主主动查询。
+
+## 我们做得比它好的地方（应当保持）
+
+| | |
+|---|---|
+| **预览-确认-提交的事务** | `preview_id` + `expected_revision` + `confirmed` + 票据重放拒绝。它的 recipe 只是"一个撤销步骤"，**没有 revision 并发保护** |
+| **不需要跨进程桥** | `RetouchOp` 是数据；它必须过 AppleScript/COM/UXP |
+| **未知算子存活** | 它的工具面是固定的 127 个；我们的文档能携带未来版本写的算子 |
+
+## 它值得单独一提的设计
+
+- **`document_id` 固定**：Photoshop 的活动标签页会被外部改变，所以每次变更都带上 id。
+  我们的 `photo_id` 解决同一类问题——**这点我们已经有**。
+- **`get_preview` 的使用纪律**："once per major step, not per atomic tool"。
+  我们的 `render_preview_with` 是同一角色，值得把这条纪律写进 instructions。
+- **`Action Plan` 模式**：一次规划调用产生有序工具列表再执行，减少往返。
+  这与"AI 提议 → 人确认 → 应用"的流程同构，可作参考。
