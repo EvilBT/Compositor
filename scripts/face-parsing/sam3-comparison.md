@@ -95,3 +95,7 @@ sam3.1-coreml 9668c4964e216cf9e3a64f0ad812af9d62b33642.
 Next executable sequence: isolated MLX runtime compatibility check; same-runtime
 SAM3/SAM3.1 unquantized local crop trials; then SAM3 8bit memory/quality tradeoff.
 Keep all source photographs local and include undecorated-face negative controls.
+
+## Completed local MLX trial (2026-10-06)
+
+SAM3 BF16, SAM3.1 as-distributed F32, SAM3 8bit and explicit SAM3.1 BF16 cast completed. 57 outputs audited, including one invalid SAM3.1 exemplar due to ignored boxes. Earlier untested entries are historical. Whole-face glitter mostly missed; fixed cheek crop produced meaningful masks in all3. No ground-truth ranking or App integration. Source hashes/crop parity and weight publisher SHA matched. See mlx-notes.md and assets/face-parsing-trial/mlx-results.md.

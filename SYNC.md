@@ -55,6 +55,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| 本轮MLX实测 | SAM3/3.1/8bit+3.1转BF16共57输出审核，源及权重SHA保持；局部改善亮片，无精度排名；3.1原包F32且MLX忽略框，已标无效。未改App，详见STATUS/mlx-results.md |
 | 本轮HF调研 | MLX SAM3/3.1/8bit匿名HEAD200，提供绕开CUDA部署依赖的候选；记录蒸馏/CoreML限制，无推理或贴钻精度排名，详见sam3-comparison.md |
 | 本轮SAM登记 | SAM3/3.1独立纳入离线比较方案；官方3.1视频入口核查、两套权重匿名401。尚未推理，不改App，需获准本地权重后比较 |
 | `9a7cc8a` | 保护/羽化离线探索：17遮罩34真实v2渲染，锁定core及皮肤外字节保持通过；普通羽化漏保护/溢出。SAM辅助12探针5接受；自然反光仍被当亮点，尚非贴钻识别。未改app；报告见assets/face-parsing-trial/protection-results.md |

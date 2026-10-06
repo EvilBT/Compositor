@@ -520,3 +520,8 @@ python3 scripts/i18n/missing.py
 ### HF优化SAM候选调研（2026-10-06）
 
 已查发布方模型卡、LiteText论文和HF API。MLX社区sam3-bf16/sam3.1-bf16/sam3-8bit均ungated，匿名权重HEAD200，纠正上一轮仅官方权重导致的访问阻碍：可走社区Apple Silicon转换途径，但尚未下载/推理/核实转换一致性。优先同MLX运行时SAM3与3.1，再测8bit内存与小目标退化；EfficientSAM3/LiteText为轻量化候选，不是贴钻精度冠军。CoreML3.1候选仅backbone+tracker；Embedl偏TensorRT且发布方cgF1较自身FP32下降。模型清单、修订及限制已写sam3-comparison.md。未改Swift/App，未运行Swift测试，本轮只资料和可用性检查。
+
+
+### MLX SAM3/3.1/8bit实测（2026-10-06）
+
+两图六提示、局部/示例框及3.1转BF16共57输出审核，源哈希/crop/权重SHA保持。3.1名bf16实际F32，峰值5.612GB，转BF16为3.897；SAM3 BF16为3.870、8bit3.222GB。后续11调用中位3.623/3.607/3.987/3.705秒，仅单次探索。整脸glitter SAM3/8bit为空，3.1仅456像素；固定局部三者找到亮片，无3.1明显优势或精度排名。男脸饰物负例均空且眼镜识别。mlx-vlm0.7.6的3.1 detector忽略boxes，一份示例框已标无效，不评价官方示例能力。完整报告/对比图assets/face-parsing-trial/mlx-results.md。下一步自动ROI、更多标注/负例、几何提示支持，再组合保护羽化。未改Swift/App，未重跑Swift测试，原照片未上传或改动。
