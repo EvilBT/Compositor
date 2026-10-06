@@ -55,6 +55,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| 本轮SAM登记 | SAM3/3.1独立纳入离线比较方案；官方3.1视频入口核查、两套权重匿名401。尚未推理，不改App，需获准本地权重后比较 |
 | `9a7cc8a` | 保护/羽化离线探索：17遮罩34真实v2渲染，锁定core及皮肤外字节保持通过；普通羽化漏保护/溢出。SAM辅助12探针5接受；自然反光仍被当亮点，尚非贴钻识别。未改app；报告见assets/face-parsing-trial/protection-results.md |
 | `f43c537` | 第二轮：加入SegFormer、两图3脸和裁切稳定性；20类别图/5布局/源保持断言通过。FaRL裁切稳定，但四模型都将夜拍贴钻算皮肤。仅离线实验，未改app；结果和限制见STATUS |
 | `9428549` | 分割实片离线试跑：SegFace Swin-B/MobileNet和FaRL均跑通双脸，比较图在assets/face-parsing-trial/comparison；源哈希保持、6张类别图及2张布局检查通过。未改app/Swift/已存遮罩，未验证CoreML；详见STATUS和脚本README |
