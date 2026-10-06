@@ -2,6 +2,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import ImageIO
 import RetouchKit
 import PortraitCore
 import PortraitMCP
@@ -9,10 +10,9 @@ import PortraitMCP
 @main
 struct PortraitMac: App {
     @NSApplicationDelegateAdaptor(PortraitAppDelegate.self) private var delegate
-    @StateObject private var model = PortraitModel()
     var body: some Scene {
         Window("人像修图 · 原型", id: "portrait") {
-            PortraitView(model: model).onAppear { delegate.model = model }
+            PortraitView(model: delegate.model)
         }
             .defaultSize(width: 1120, height: 760)
     }
@@ -43,6 +43,20 @@ final class PortraitModel: ObservableObject {
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task { if await allowDiscard() { load(url) } }
+    }
+
+    func openExternal(_ urls: [URL]) async {
+        guard urls.count == 1, let url = urls.first, url.isFileURL,
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              CGImageSourceGetCount(source) > 0 else {
+            error = "请一次打开一张有效的照片。"
+            return
+        }
+        guard !busy else {
+            error = "当前处理尚未完成，请稍后再打开照片。"
+            return
+        }
+        if await allowDiscard() { load(url) }
     }
 
     func openDocument() {
@@ -473,9 +487,39 @@ final class PortraitAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    weak var model: PortraitModel?
+    // The single scene can be rebuilt by external events; edits belong to the application.
+    let model = PortraitModel()
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        receiveFiles(urls)
+        application.activate(ignoringOtherApps: true)
+    }
+
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        receiveFiles(filenames.map { URL(fileURLWithPath: $0) })
+        sender.reply(toOpenOrPrint: .success)
+        sender.activate(ignoringOtherApps: true)
+    }
+
+    func application(_ sender: NSApplication, openFile filename: String) -> Bool {
+        receiveFiles([URL(fileURLWithPath: filename)])
+        sender.activate(ignoringOtherApps: true)
+        return true
+    }
+
+    private func receiveFiles(_ urls: [URL]) {
+        let window = NSApplication.shared.windows.first { $0.identifier?.rawValue == "portrait" }
+        Task {
+            await model.openExternal(urls)
+            window?.makeKeyAndOrderFront(nil)
+        }
+    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // External file events can close the single SwiftUI scene while it is being restored.
+        false
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let model else { return .terminateNow }
         Task { sender.reply(toApplicationShouldTerminate: await model.allowDiscard()) }
         return .terminateLater
     }
