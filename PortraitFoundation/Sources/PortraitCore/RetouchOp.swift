@@ -299,8 +299,8 @@ public struct SkinToneStats: Codable, Sendable, Equatable {
     public var luminanceStdDev: Double
     /// Fraction of the face region classified as skin.
     public var coverage: Double
-    /// Fraction of skin pixels more than 0.15 in luminance from the local median —
-    /// a proxy for blemish load, which is what drives `blemish` strength.
+    /// Fraction of high-coverage skin occupied by conservative blemish candidate footprints.
+    /// A detector statistic, not a diagnosis or an instruction to increase smoothing.
     public var blemishFraction: Double
 
     public init(meanColor: SIMD3<Double>, luminanceStdDev: Double, coverage: Double, blemishFraction: Double) {

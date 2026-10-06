@@ -1,5 +1,17 @@
 # 项目状态
 
+最新进度（2026-10-07，T3）：新增PortraitAnalysis/BlemishDetector，采用多尺度内外框均值对比、局部红/暗差、环形邻域一致性、鼻影与高光排除、稳定排序/NMS。默认门槛0.8，只输出可审查候选，不诊断暂时性、不修补照片。全候选圆盘在非零皮肤遮罩内，统计以圆盘交高覆盖像素的并集/高覆盖皮肤像素计。MCP analyze_faces现在提供blemishes、detectorVersion及availability=true；SkinToneStats.blemishFraction不再是占位。新增可选缓存字段，旧缓存仅用冻结遮罩补元数据，PNG不变；文档结构、processVersion、skin算法不改。
+
+两张原片3张脸+2个原尺寸裁切实测：双人2048预览男性1/女性0，装饰预览0；男性原尺寸2（明显下巴红点及脸颊小红点），装饰原尺寸0。宽松初版36/4含鼻影、普通纹理、亮片邻域，收紧后未选深色痣和亮片；不能据此保证所有痣/雀斑不误选。已看四个最终图；分辨率不同会产生不同候选，零值不等于无瑕疵。没有人工标注，不给精度/召回率。照片完整SHA保持、未上传。
+
+Release检测三次中位：双人预览17.0ms、装饰预览6.8ms、男性原尺寸110.5ms、装饰原尺寸76.3ms；总分析（一次，不含照片加载）156.1/110.6/345.1/291.3ms。不是跨设备基准。四份final/v4跨进程候选逐项相同，每份又3次一致且圆盘不越遮罩。独立MCP两图available=true、候选1/0、revision0、栈空。复现runner实跑通过。产物与完整报告 /Users/xiaoman/Developer/assets/blemish-trial/results.md；代码/复现说明scripts/blemish-trial/README.md。
+
+Debug/Release各60项（Core19/Render18/Analysis6/MCP14/Mac3）通过，iOS编译通过，核心无AppKit/UIKit，原skin v1/v2指纹和栈契约通过。新增4检测回归、1MCP缓存升级/协议回归；日志/tmp/portrait-t3-debug.log、/tmp/portrait-t3-release.log、/tmp/portrait-t3-ios.log、/tmp/portrait-t3-protocol.log、/tmp/portrait-t3-runner.log。更新assets/PortraitPrototype.app Release二进制，未退出用户应用，重启生效；未添加原生候选UI。临时Swift scratch/harness清理，实验图与环境保留。按既有要求不远端同步。
+
+剩余：漏非红/轻微瑕疵和鼻影/高光附近，仍可能混淆红痣、妆容、毛囊；须审查候选并允许手工补点。T4实际修补、T5自动通道未做，不能把本轮当祛痘成片。T3待独立复核，下一项T4未认领。
+
+以下为历史记录：
+
 最新进度（2026-10-06，T12）：先读最新同步板，T8由复核方独立8/8验收，原待验收请求已关闭。按插队要求完成坐标说明与校验。实际原生探针image `[3000,2000]`旧validate接受，新validate抛outOfRange，字段spots[0].at.value.x，范围0...1。MCP独立客户端前后同一blemish像素请求均unsupportedOperation且未写文档：当前StackCodec未开放带锚点算子，并非当前MCP已经静默渲染错位。
 
 统一验证blemish目标/复制源和localAdjustment的中心/路径点。image/face有限0...1；landmark为有符号的人脸宽度分数，负值和超过1允许，仅拒绝非有限值，以保留跨边界/图外的合法表达。不能按0...1一刀切，也不自动猜测像素。已补initialize契约：参照系、左上原点/y向下、两轴脸宽偏移、skin.radius像素和spot.radius脸宽分数。未知算子不改，编码格式/processVersion/渲染算法均未改。

@@ -124,7 +124,7 @@ MCP Server (进程内)  →  直接读写 RetouchOp 栈  →  App 重绘
 }
 ```
 
-`skinTone` 里那几个数字的存在，是为了让模型**不必猜强度**：`luminanceStdDev` 低说明皮肤本来就细腻、磨皮强度该往下调；`blemishFraction` 高说明瑕疵多、该往上调。
+`skinTone` 里那几个数字的存在，是为了让模型**不必猜强度**：`luminanceStdDev` 低说明皮肤本来就细腻、磨皮强度该往下调；`blemishFraction` 是保守候选覆盖率，需先检查候选；它不直接决定磨皮强度，也不能把零值理解为没有瑕疵。
 
 ### `render_preview_with`
 

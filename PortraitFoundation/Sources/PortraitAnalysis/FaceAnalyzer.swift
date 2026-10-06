@@ -31,13 +31,19 @@ public struct FaceAnalysisResult: @unchecked Sendable {
     public let skinMask: CGImage
     public let geometry: [FaceGeometry]
     public let warnings: [String]
+    public let blemishes: [BlemishCandidate]
+    public let blemishDetectorVersion: String?
+    public var blemishDetectionAvailable: Bool { blemishDetectorVersion != nil }
 
     /// Restore a validated analysis cache without rerunning a newer detector.
-    public init(faces: [FaceAnalysis], skinMask: CGImage, geometry: [FaceGeometry], warnings: [String]) {
+    public init(faces: [FaceAnalysis], skinMask: CGImage, geometry: [FaceGeometry], warnings: [String],
+                blemishes: [BlemishCandidate] = [], blemishDetectorVersion: String? = nil) {
         self.faces = faces
         self.skinMask = skinMask
         self.geometry = geometry
         self.warnings = warnings
+        self.blemishes = blemishes
+        self.blemishDetectorVersion = blemishDetectorVersion
     }
 }
 
@@ -206,9 +212,10 @@ public struct FaceAnalyzer: Sendable {
             }
             faces.append(face)
         }
-        warnings.append("Coverage is a conservative landmark/chroma heuristic; inspect makeup, hair and occlusions. Blemish detection is unavailable; blemishFraction is not measured.")
-        return FaceAnalysisResult(faces: faces, skinMask: try makeImage(mask, width: width, height: height),
-                                  geometry: geometry, warnings: warnings)
+        warnings.append("Coverage is a conservative landmark/chroma heuristic; inspect makeup, hair and occlusions.")
+        return try BlemishDetector(maximumPixels: maximumPixels).analyze(image,
+            coverage: FaceAnalysisResult(faces: faces, skinMask: try makeImage(mask, width: width, height: height),
+                                        geometry: geometry, warnings: warnings))
     }
 
     static func convexHull(_ points: [SIMD2<Double>]) -> [SIMD2<Double>] {

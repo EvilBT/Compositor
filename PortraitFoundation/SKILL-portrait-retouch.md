@@ -61,7 +61,7 @@ description: Retouch a portrait end to end — analyse the face, decide strength
 
 这个样本的全脸亮度标准差约 0.098、覆盖比例约 0.38；前者包含灯光与妆容，
 **不能直接套下面的“>0.06 → 强磨皮”表**。`blemishDetectionAvailable = false` 时，
-`blemishFraction` 是占位值，不能解释成“没有瑕疵”。覆盖率低或遮罩不确定时先核对边界。
+`blemishFraction` 是占位值，不能解释成“没有瑕疵”。 为 true 时也只是保守候选圆盘占高覆盖皮肤的比例；低值或零值可能是漏检，不能据此判定皮肤无瑕疵，也不能直接增加磨皮强度。覆盖率低或遮罩不确定时先核对边界。
 
 当前只有一个人的一张照片，以上数值是样本级校准，尚未证明适用于不同肤色、年龄、
 角度或照明。判断纹理要看原生分辨率特写，不只看缩小的整图；选择应以人的审美为准。
@@ -114,7 +114,7 @@ analyze_faces(photo_id)
 | 字段 | 含义 | 怎么用 |
 |---|---|---|
 | `skinTone.luminanceStdDev` | 皮肤纹理/噪点下限 | **< 0.03** → 皮肤本来细腻，磨皮强度砍半<br>**> 0.06** → 需要正常或偏强 |
-| `skinTone.blemishFraction` | 瑕疵密度 | **< 0.005** → 基本不用去瑕疵<br>**> 0.02** → 需要重点处理 |
+| `skinTone.blemishFraction` | 保守候选覆盖率 | 先查看候选点位；低值仍可能包含明显红点，不按未经校准的面积阈值决定是否祛瑕疵 |
 | `skinTone.meanColor` | 平均肤色 | 判断偏黄/偏红/偏青的基调，决定白平衡方向 |
 | `skinTone.coverage` | 皮肤占人脸比例 | 太低（< 0.5）说明检测不准或脸部被遮挡，**降级为保守处理** |
 

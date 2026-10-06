@@ -94,7 +94,8 @@ public actor PortraitSession {
            let source = CGImageSourceCreateWithData(cache.mask as CFData, nil),
            let mask = CGImageSourceCreateImageAtIndex(source, 0, nil),
            mask.width == photo.image.width, mask.height == photo.image.height {
-            analysis = FaceAnalysisResult(faces: cache.faces, skinMask: mask, geometry: cache.geometry, warnings: cache.warnings)
+            analysis = FaceAnalysisResult(faces: cache.faces, skinMask: mask, geometry: cache.geometry, warnings: cache.warnings,
+                blemishes: cache.blemishes ?? [], blemishDetectorVersion: cache.blemishDetectorVersion)
         }
         return PortraitSession(photo: photo, document: document, storageURL: documentURL, storedData: storedData, analysis: analysis)
     }
@@ -104,8 +105,10 @@ public actor PortraitSession {
 
     /// Cache detection and coverage from unchanged upright source pixels.
     public func analyzeFaces() throws -> FaceAnalysisResult {
-        if let analysis { return analysis }
-        let result = try analyzer.analyze(photo.image)
+        if let analysis, analysis.blemishDetectionAvailable { return analysis }
+        // Upgrade legacy statistics using frozen coverage, never a newer skin detector.
+        let result = try analysis.map { try BlemishDetector().analyze(photo.image, coverage: $0) }
+            ?? analyzer.analyze(photo.image)
         analysis = result
         document.faces = result.faces
         return result
@@ -259,7 +262,8 @@ public actor PortraitSession {
         let cache = try analysis.map { analysis in
             try encoder.encode(AnalysisCache(version: 1, sourceHash: photo.reference.contentHash,
                 faces: analysis.faces, geometry: analysis.geometry, warnings: analysis.warnings,
-                mask: PhotoIO.encode(analysis.skinMask)))
+                mask: PhotoIO.encode(analysis.skinMask), blemishes: analysis.blemishes,
+                blemishDetectorVersion: analysis.blemishDetectorVersion))
         }
         let expected = storedData
         var coordinationError: NSError?, writeError: Error?
@@ -284,6 +288,8 @@ private struct AnalysisCache: Codable {
     let geometry: [FaceGeometry]
     let warnings: [String]
     let mask: Data
+    let blemishes: [BlemishCandidate]?
+    let blemishDetectorVersion: String?
 }
 
 private final class PortraitSessionExecutor: SerialExecutor, @unchecked Sendable {

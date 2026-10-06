@@ -80,7 +80,9 @@ public actor MCPServer {
             let info = JSONValue.object([
                 "photo_id": .string(session.photoID), "revision": .int(snapshot.revision),
                 "faces": try json(analysis.faces), "warnings": try json(analysis.warnings),
-                "maskMethod": .string("landmark/chroma heuristic"), "blemishDetectionAvailable": .bool(false),
+                "maskMethod": .string("landmark/chroma heuristic"), "blemishDetectionAvailable": .bool(analysis.blemishDetectionAvailable),
+                "blemishes": try json(analysis.blemishes),
+                "blemishDetectorVersion": try json(analysis.blemishDetectorVersion),
                 "stack": try json(snapshot.document.ops), "process_version": .int(snapshot.document.processVersion)
             ])
             return .object(["content": .array([try textJSON(info),

@@ -162,6 +162,47 @@ struct MCPTests {
         #expect(FileManager.default.fileExists(atPath: url.path))
     }
 
+    @Test("Blemish metadata persists and legacy analysis upgrades without regenerating frozen coverage")
+    func blemishCacheUpgrade() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("edit.json"), photo = try photo()
+        let session = PortraitSession(photo: photo)
+        let analysis = try await session.analyzeFaces()
+        #expect(analysis.blemishDetectionAvailable)
+        try await session.save(to: url)
+        let cacheURL = url.appendingPathExtension("analysis.json")
+        var cache = try #require(JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: cacheURL)).objectValue)
+        #expect(cache["blemishDetectorVersion"]?.stringValue != nil)
+        #expect(cache["blemishes"]?.arrayValue == [])
+        let reopened = try PortraitSession.open(photo: photo, documentURL: url)
+        #expect(try await reopened.analyzeFaces().blemishes == analysis.blemishes)
+        let frozen = cache["mask"]
+        cache.removeValue(forKey: "blemishes")
+        cache.removeValue(forKey: "blemishDetectorVersion")
+        try JSONEncoder().encode(JSONValue.object(cache)).write(to: cacheURL)
+        let legacy = try PortraitSession.open(photo: photo, documentURL: url)
+        let upgraded = try await legacy.analyzeFaces()
+        #expect(upgraded.blemishDetectionAvailable)
+        #expect(try PhotoIO.bytes(upgraded.skinMask) == PhotoIO.bytes(analysis.skinMask))
+        try await legacy.save(to: url)
+        let persisted = try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: cacheURL)).objectValue
+        #expect(persisted?["mask"] == frozen)
+        #expect(persisted?["blemishDetectorVersion"]?.stringValue != nil)
+        let server = MCPServer(session: legacy)
+        _ = try await rpc(server, "initialize", .object([
+            "protocolVersion": .string("2025-06-18"), "capabilities": .object([:]),
+            "clientInfo": .object(["name": .string("test"), "version": .string("1")])]))
+        _ = try await rpc(server, "notifications/initialized", id: nil)
+        let result = try #require(await rpc(server, "tools/call", .object([
+            "name": .string("analyze_faces"), "arguments": .object(["photo_id": .string(photo.id)])]))?.objectValue?["result"])
+        let text = try #require(result.objectValue?["content"]?.arrayValue?.first?.objectValue?["text"]?.stringValue)
+        let info = try JSONDecoder().decode(JSONValue.self, from: Data(text.utf8)).objectValue
+        #expect(info?["blemishDetectionAvailable"] == .bool(true))
+        #expect(info?["blemishes"]?.arrayValue == [])
+    }
+
     @Test("Native approval uses user provenance and undo invalidates an older candidate")
     func nativeApproval() async throws {
         let session = PortraitSession(photo: try photo())

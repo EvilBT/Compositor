@@ -42,9 +42,23 @@ mapping assumes an upright, unmirrored frontal face. Indices are sorted by image
 not persistent person tracking. Face identity across redetection or multiple photographs
 is unimplemented.
 
-`luminanceStdDev` includes lighting and makeup, not just pores. Blemish detection is absent;
-`blemishFraction` is a placeholder and `blemishDetectionAvailable` is false. A nonzero
-`skin.blemishStrength` is an error. Do not derive stronger smoothing from these statistics alone.
+`luminanceStdDev` includes lighting and makeup, not just pores. `analyze_faces` now exposes
+conservative `blemishes` with face-relative anchors, face-width radii, heuristic confidence
+and `blemishDetectorVersion`; `blemishDetectionAvailable` is true after detection.
+`blemishFraction` measures the union of candidate disks intersecting skin coverage >=128,
+divided by that face's coverage >=128 pixel count. It is not a calibrated acne density;
+zero can mean omission, not clear skin. The default detection threshold is 0.8.
+Candidates require review, especially around moles, freckles, facial hair and decorations.
+Nose shading, highlights and non-red defects are deliberately omitted.
+A nonzero `skin.blemishStrength` remains an error and `.blemish` rendering is still
+unsupported (T4/T5). Do not derive stronger smoothing from these statistics alone.
+
+Detection uses local RGB contrast at several face-relative scales with an integral-image
+background and surrounding-ring checks. It adds no model or image repair dependency.
+Legacy analysis caches gain optional candidate metadata using their frozen skin mask;
+coverage is not regenerated. New metadata is saved with the next explicit session save
+or accepted edit. Source pixels, existing skin masks and skin render versions are unchanged.
+Reproduction and real-photo limitations: `../scripts/blemish-trial/README.md`.
 
 ## Renderer coverage
 
