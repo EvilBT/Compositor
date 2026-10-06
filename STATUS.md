@@ -1,5 +1,15 @@
 # 项目状态
 
+最新进度（2026-10-06，保护与羽化探索 / `9a7cc8a`）：用户要求实测组合遮罩与羽化。新增独立诊断脚本、Swift渲染harness和复现说明；未改应用或任何Swift库源码/保存格式/processVersion。用FaRL皮肤类别、局部亮点候选、保护核心扩边和距离smoothstep羽化，另试guided filter和SAM2.1 Hiera Tiny（官方源码revision 2b90b9f5ceec907a1c18123530e92e794ad901a4）。SAM由亮点提示+局部框引导，不是识别贴钻的语义模型，12探针接受5/拒绝7。
+
+夜拍裁切1470×1470、源人脸宽890.9px，扩边3px，羽化3/7/14px；323亮点候选、4852核心像素。全尺寸crop调用既有SkinRenderer v2、radius12，标准0.65/0.30和压力0.85/0.15，总17遮罩/34实际PNG输出。压力档：仅分割4852核心变化/max86；普通高斯羽化4004核心变化/max28，皮肤外35322像素变化；锁核心、guided锁核心、SAM锁核心核心和皮肤外均0。3/7/14档均保持0；宽羽化减少处理面积。guided与距离羽化实际结果有31619像素差异/max15，不能说两者等同，但本次未见明确视觉优势。
+
+无贴钻男人人像对照仍产生51候选/756核心（含鼻尖额头自然反光），证明亮点规则不能作为饰物分类器。未标注ground truth；保护0仅指被检测核心，不能等同所有贴钻完整识别。仍需装饰物语义/上下文或手工补保护。17遮罩/34渲染尺寸、各锁定变体core/non-skin逐像素保持、4个audit源哈希通过；脚本语法/diff检查与遮罩、实际图、羽化扫描图目视核查通过。harness Release构建成功；本轮未重跑Swift49项，未验证CoreML/整图预览一致或无光晕保证。
+
+结果 `/Users/xiaoman/Developer/assets/face-parsing-trial/protection-results.md`，目录protection-night-v2、protection-night-narrow、protection-night-wide、protection-control；feather-sweep.jpg为三档图。日志 `/tmp/portrait-protection-mask-v2.log`、`/tmp/portrait-protection-render.log`、`/tmp/portrait-protection-audit.log`及narrow/wide/control日志。源照片未写，照片未上传。下一步优先改善装饰物识别，再集成保护核心+向外羽化；本实验并非新app功能已经完成。
+
+以下为前轮历史记录：
+
 最新进度（2026-10-06，分割第二轮 / `f43c537`）：加入SegFormer-B5（发布者jonathandinu/face-parsing，revision 758b82e15a0178c9db39c1ff666a8b56e3a550c8），扩到两张实片共3脸；Swin-B、MobileNet、FaRL、SegFormer全部本地CPU跑通。另对双人图以1.65与1.4裁切重复4模型：按源图固定Vision脸框比较皮肤+鼻子分类，FaRL变化0.86/1.00%，SegFormer1.17/1.27%，Swin2.04/1.62%，MobileNet2.66/2.49%。这是裁切稳定性，不是ground-truth准确率。
 
 新增稳定性工具投影各自label图到原图再比较；SegFormer类ID从配置读取，报告记录独立label_names/输入尺寸/权重哈希。20张类别输出（4模型×夜拍1脸、双人2脸、裁切变化2脸）类ID0–18、5张2880×550布局、三个报告所有模型无error及source_unchanged=true断言通过；两张双人图及夜拍/细节图目视核查。脚本语法与diff检查通过。本轮未改Swift/app，未重跑49项；Release宿主为另一照片基准重新构建成功。
