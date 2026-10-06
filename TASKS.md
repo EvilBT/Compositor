@@ -107,6 +107,29 @@ SwiftPM 产出的是裸 Mach-O，没有 bundle 身份，于是 SwiftUI 的 `Wind
 
 **这是 `SkinParams.blemishStrength` 和 `.blemish` 算子共同的缺失前置。**
 
+**⚠️ 动手前先读：为什么这里**不要**用生成式模型**（复核方调研 2026-10-06）
+
+开源生态里祛瑕疵有两条路，**对你们的架构，只有一条是通的**：
+
+| 路线 | 代表 | 问题 |
+|---|---|---|
+| **生成式修补** | [IOPaint](https://github.com/Sanster/IOPaint) / LaMa（**Apache 2.0**，支持 Apple Silicon，同作者已出 macOS+iOS 的 OptiClean） | 需要**模型**→ 同一文档在 Mac 与 iPhone 上**渲染不一致**，**违反规则 4**；且破坏字节指纹 |
+| **确定性克隆/修补** | PS 的污点修复、GIMP 的 resynthesizer（**GPL，许可有传染性，不能链进非 GPL 应用**） | 算法要自己实现，但**无模型、逐位可复现、三端一致** |
+
+**结论：T3 用确定性算法。** 判据是一条通用规则：
+
+> **模型只用在「输出可以被保存」的地方（分析、遮罩、检测结果）；
+> 输出必须三端逐位一致的地方（渲染），只用确定性算法。**
+
+这条规则也解释了为什么 SAM3 那条路必须先解决"遮罩存哪"（T10 前置）——
+因为**分析结果存下来之后**，iPhone 就不需要再跑模型，只负责渲染。
+
+**所以**：检测（T3）与修补（T4）都走确定性路线。可以用 PatchMatch / 纹理合成的思路，
+但**必须自己实现或用宽松许可的实现**（MIT / Apache-2.0 / BSD），**不要引入 GPL 代码**。
+
+另外：LaMa/IOPaint 只解决「填什么」，**不解决「哪里是瑕疵」**——
+检测仍然是 T3 的核心工作，那部分没有现成的可抄。
+
 **改哪里**：`Sources/PortraitAnalysis/`（检测）＋ 填充 `FaceAnalysis.skinTone.blemishFraction`
 
 **⚠️ 最重要的约束：宁可漏检，不可误删。**
@@ -387,6 +410,19 @@ App 正在运行时，执行 `open -a PortraitMac.app 某张照片.jpg`，**App 
 | **压感 / Apple Pencil** | 需要先有 iPad 端 |
 | **`CompositorKit` 抽取** | 与新 App 的关系（复用 vs 重写像素引擎）尚未决定 |
 | **液化 / 眼牙 / 光影** | 依赖顺序在祛瑕疵之后 |
+
+---
+
+## 二·五、值得一读的参考（不是任务）
+
+| 项目 | 许可 | 为什么值得看 |
+|---|---|---|
+| [alisaitteke/photoshop-mcp](https://github.com/alisaitteke/photoshop-mcp) | **MIT** | 它**独立地**解出了和你们相同的问题：**状态感知**（`get_state` / `get_preview` / `get_capabilities`）、**recipe 工具**（把多步操作包成**单个撤销步骤**）、**结构化错误信封**（让 agent 知道下一步试什么）。**"recipe" 和你们的 `RetouchOp` 栈是同一个想法。** |
+| [Sanster/IOPaint](https://github.com/Sanster/IOPaint) | 工具本身开源；模型各异 | 祛瑕疵的生成式路线。**但见 T3：模型会破坏三端一致的渲染**，所以只作参照，不作依赖 |
+
+**关键区别，别照抄架构**：Photoshop MCP 必须跨进程桥（ExtendScript / UXP WebSocket）才能驱动 PS，
+而**你们不需要**——因为 `RetouchOp` 是可序列化数据。`MCP-TOOLS.md` 里已经写明了这一点。
+**读它的工具面设计，不要读它的传输层。**
 
 ---
 
