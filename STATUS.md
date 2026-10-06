@@ -1,5 +1,15 @@
 # 项目状态
 
+最新进度（2026-10-06，分割第二轮 / `f43c537`）：加入SegFormer-B5（发布者jonathandinu/face-parsing，revision 758b82e15a0178c9db39c1ff666a8b56e3a550c8），扩到两张实片共3脸；Swin-B、MobileNet、FaRL、SegFormer全部本地CPU跑通。另对双人图以1.65与1.4裁切重复4模型：按源图固定Vision脸框比较皮肤+鼻子分类，FaRL变化0.86/1.00%，SegFormer1.17/1.27%，Swin2.04/1.62%，MobileNet2.66/2.49%。这是裁切稳定性，不是ground-truth准确率。
+
+新增稳定性工具投影各自label图到原图再比较；SegFormer类ID从配置读取，报告记录独立label_names/输入尺寸/权重哈希。20张类别输出（4模型×夜拍1脸、双人2脸、裁切变化2脸）类ID0–18、5张2880×550布局、三个报告所有模型无error及source_unchanged=true断言通过；两张双人图及夜拍/细节图目视核查。脚本语法与diff检查通过。本轮未改Swift/app，未重跑49项；Release宿主为另一照片基准重新构建成功。
+
+视觉发现：浓妆夜拍的贴钻/亮片被四个学习模型当成皮肤，现有色度/高光规则保留部分亮点；因此不能直接用模型皮肤类别替换处理遮罩。FaRL在这两脸上更稳定，Swin精度版更快；SegFormer冷CPU前向双人2.607/2.279秒、夜拍2.615秒，未显示足以定为优先接入的优势。不同对齐、单次冷测和无人工标注限制全部保留。眼镜整个镜片、胡须、贴钻仍需处理策略；下一步优先Swin/FaRL+保护规则，再CoreML/ANE验证，不是现在声称已集成。
+
+结果与中文报告 `/Users/xiaoman/Developer/assets/face-parsing-trial/round2-results.md`，完整图在night-expanded/couple-expanded，细节night-details.jpg，裁切对照couple-crop14、crop-stability.json。源照片未改，照片未上传。另查官方DML-CSR（边缘多任务，老CUDA/Inplace-ABN）和第三方DINOv3+VGG19（列独立胡须类，但未验证benchmark），均未跑，不能作为已验证优质替代。SegFormer模型卡非商业研究/教育用途，应与代码许可分开核实。日志 `/tmp/portrait-parsing-night-expanded.log`、`/tmp/portrait-parsing-couple-expanded.log`、`/tmp/portrait-parsing-couple-crop14.log`。
+
+以下为前轮历史记录：
+
 最新进度（2026-10-06，分割离线试跑 / `9428549`）：用户授权尝试 SegFace/FaRL，新增独立 `scripts/face-parsing/` 评估工具与锁定环境清单。对20261005.jpg双脸运行 SegFace Swin-B/512、MobileNet/512、FaRL CelebM/448，均成功。原图6240×4160；baseline为现有host在2048px预览生成的覆盖，映射到源图的人脸方形裁切；Swin/MobileNet使用ImageNet归一化，完整checkpoint严格加载；FaRL采用官方RetinaFace、对齐和warp。原始19类输出及比较图、源/权重哈希在 `/Users/xiaoman/Developer/assets/face-parsing-trial/comparison/`；源哈希未变。模型与代码下载，照片仅本机处理。
 
 视觉观察（非人工标注精度评测）：学习模型的额头/发际线覆盖比现有启发式更连续，能单独标记眼镜；MobileNet在人脸1手边纸巾附近产生皮肤小块误选。三者仍无胡须独立类别，镜片整体作为眼镜保护将同时排除镜片后的可见皮肤。FaRL边界较平滑，但尚不能凭两张脸断言胜过Swin。CPU四线程单次前向：Swin两脸0.810/0.732秒，MobileNet0.329/0.313秒；FaRL含检测1.812/1.648秒。不同对齐路径、不同输入、未测稳态，不能作为架构公平排名或手机速度。
