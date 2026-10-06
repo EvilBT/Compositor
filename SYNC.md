@@ -33,7 +33,7 @@
 | T5 | `skin.blemishStrength` 自动通道 | P2 | ⬜ 待认领 |
 | T6 | 遮罩覆盖扩到脖子/胸口/耳朵 | P2 | ⬜ 待认领 |
 | T7 | 性别化强度（只做管道） | P3 | ⬜ 待认领 |
-| T8 | **向 App 传文件会导致它退出** | P1 | 🔵 Codex进行中 |
+| T8 | 向 App 传文件会导致它退出 | P1 | ✅ `6a23f3f`，**复核方 8/8 项已验收** |
 | T9 | 装饰物保护（无模型方案） | P2 | ⬜ **降级为备用** |
 | T10 | **接入选定的分割与装饰保护** | P1 | ⬜ 待认领（选型见 `scripts/face-parsing/DECISION.md`） |
 
@@ -57,6 +57,7 @@
 
 | commit | 做了什么 |
 |---|---|
+| （复核） | **T8 独立验收通过（8/8）**，用 AX API 驱动真实界面而非读总结：传照片后 App 存活且**标题变为 `20261005.jpg`**（证明真的载入）；非图片文件存活 + 提示「请一次打开一张有效的照片。」+ **保留原照片**；不存在的文件与连续传两张均无害；有未保存改动时弹「离开当前照片？」三按钮，**按「取消」仍是原照片、按「放弃并继续」才换图** |
 | `6a23f3f` | T8文件事件及会话保持；Debug/Release各52项、iOS通过，真实open/非图/取消保持通过。CUA拖图未送达，尚不标完成，见STATUS |
 | `3980c8e` | 用户选择质量优先：FaRL+SAM3 BF16+自动局部保守确认+核心羽化；8bit内存备用，3.1不默认。DECISION.md为后续入口，仅文档、App未接入；取代旧暂停/先T9的选型前置，T9仍待实现 |
 | `d02c142` | 自动ROI/皮肤约束/提示交集/共享编码/核心羽化；两图3脸两模型120预测、48真实v2渲染、5回归通过。核心/皮肤外0变化，普通脸候选清零；有漏检及邻近皮肤保护。未改App，见STATUS/离线报告 |
@@ -254,6 +255,19 @@
    `validateMenuItem`（用菜单标题找子菜单）、`ShortcutDefinition.id`（用标题当 UserDefaults 的 key）。
 4. **`swift build` 是 Debug。** 报性能数字前先 `-c release`。（见 4.1）
 5. **绝不翻译 PSD 四字符码**：`Layr` `Mtrn` `Rght` `Btom` `Rd  ` `Grn ` `Bl  ` `Txt ` `Clss` `Idnt` `Ornt`。
+
+6. **SwiftUI 窗口的内容，`System Events` 的 `entire contents` 查不到——直调 AX API 可以。**
+   `entire contents` 返回 **0 个元素**，直接 `AXUIElementCreateApplication` + `kAXChildrenAttribute`
+   递归能拿到 **30 个**（全部按钮、滑条、文本）。
+   **不要用 `entire contents` 判断 SwiftUI 窗口是不是空的**——复核方差点据此误报「UI 没渲染」。
+   工具在本仓库 `.dd/tools/axprobe`（未提交）。
+
+7. **拖照片有两条不同的路径，别混为一谈。**
+   - **拖到 Dock 图标** / 右键「打开方式」→ `odoc` Apple Event → **可用**
+     （`6a23f3f` 实现了 `application(_:open:)` / `openFiles` / `openFile` 三个入口）
+   - **拖进窗口** → 需要 SwiftUI `.onDrop` / `dropDestination` → **当前未实现，无反应**
+
+   `open -a <app> <照片>` 走的是第一条路径，可作为它的验收手段。
 
 ### schema 与错误信息（以下历史缺口已在 `84d87bf` 修复）
 
