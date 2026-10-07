@@ -38,7 +38,7 @@
 | ③ 颜色 | `localAdjustment` | 🔴 渲染未实现 | T14（暂缓，需先定与 tone 的边界） |
 | ④ 斑点 | `.blemish` | 🟡 检测已做（T3），渲染未做 | T4 |
 
-**顺序改成：② → ④ → ③**，因为修图师是**先统一大面、再修局部**；
+**顺序改成：②（T13）→ ④（T4）→ ③（T14）**，因为修图师是**先统一大面、再修局部**；
 先点痘再整体压平会把刚修的功夫抹掉。
 
 **② 的关键约束（来自检索）**：照 `retouch-dodge-burn-onnx` 的范式——
@@ -521,6 +521,90 @@ instructions 里写死了 "Only skin, tone, presence, whiteBalance and point ton
 - [ ] `SYNC.md` 记录实测
 
 **明确不做**：不引入跨进程桥；不改现有的票据/revision 事务（那比参考实现更强）
+
+---
+
+## T13 · 明暗通道：Dodge & Burn 的图与渲染 ⭐ **下一个**
+
+**优先级** P1　**规模** 中偏大　**依赖** 无
+**依据**：用户目标修正（见第〇·五节）与 [`SKIN-QUALITY-RESEARCH.md`](SKIN-QUALITY-RESEARCH.md)
+
+### 为什么是这条
+
+用户的原始目标是**最佳皮肤质感**，四条通道里 ① 已实现，**② 明暗是修图师工作流的第二步**，
+而且**算子早就定义好了，只是渲染器没实现**。
+
+修图师**先统一大面、再修局部**——先点痘再整体压平，会把刚修的功夫抹掉。所以 ② 排在 ④ 前面。
+
+### ⚠️ 好消息：**格式问题已经有了答案，不要再重新设计**
+
+`DodgeBurnParams` 已经完整定义：
+
+```swift
+public struct DodgeBurnParams: Codable, Sendable, Equatable {
+    public enum Blend: String, Codable, Sendable {
+        case softLight      // 50% grey on Soft Light — the classic, and the safest default
+        case overlay
+        case luminanceOnly  // Only L changes; hue and saturation are held. For skin, this is usually right.
+    }
+    public var map: UUID          // AssetRef id, kind == .signedLight16
+    public var amount: Double = 1 // -2...2
+    public var blend: Blend = .softLight
+    public var contrast: Double = 0
+}
+```
+
+**`map` 是 `AssetRef(kind: .signedLight16)`，而 `PortraitDocument.assets` 已经存在**
+（`RetouchOp.swift:77`，注释明确写了 "painted dodge & burn maps"）。
+校验也已经就位（`:950` 检查 asset 是否存在）。
+
+**结论：光影图是【文档资源】，不是【可重新生成的分析缓存】。**
+它天然随文档走，**所以 iPhone 能渲染 Mac 上做的光影**——规则 4 自动满足。
+
+> 这条区分很重要，请记进 `AGENTS.md` 或 `MCP-TOOLS.md`：
+> **可确定性重算的分析 → 缓存（sidecar）；不能重算或经人修改的 → 资源（进文档）。**
+> T10 的 SAM3 遮罩属于后者（iPhone 跑不了 SAM3），**所以它也应该变成资源**。
+
+### 要做三件事
+
+**A. 分析：产出带符号光影图**（先确定性，**不要一上来找模型**）
+
+- 输出一张 `signedLight16`：**正值 = dodge（提亮），负值 = burn（压暗）**，
+  中性 = 0。模型 card 的范式是"**交还一张灰图，不是滤过的照片**"——
+  我们照做，因为灰图**可保存、可人工改、可三端一致渲染**
+- 先试确定性方法（局部明暗不均的平滑估计、CLAHE 风格的自适应、引导滤波），
+  **只有在不够用时才考虑模型**，而且要记住模型会把图变成"不可在 iPhone 上重算的资源"
+- **必须保护**：痣、雀斑、疤痕、亮片、妆容**不能进光影图**（它们是特征，不是"需要压平的起伏"）
+
+**B. 渲染：实现 `.dodgeBurn`**
+
+- `PortraitRenderer.renderStep` 里实现 `.dodgeBurn`，目前抛 `unsupportedOperation`
+- 三种 `Blend` 语义要按注释实现，尤其 `luminanceOnly`（注释说"for skin, this is usually right"）
+- `contrast` 在**应用前**曲线化光影图；`amount == 0` 必须是**恒等**
+
+**C. 资源的读写**
+
+- 让 `signedLight16` 能被写出/读入并存进文档
+- 确认 **16 位精度**在往返后逐位保持（8 位不够做细腻的光影）
+
+### 验收标准
+
+- [ ] 全零光影图 → **恒等变换**（逐位不变）
+- [ ] `amount == 0` → **恒等变换**
+- [ ] 三种 `Blend` 产生**可区分且有文档依据**的结果；`luminanceOnly` **不改变色相/饱和度**
+- [ ] `signedLight16` 往返**逐位一致**（16 位精度不丢）
+- [ ] **`renderStack` 折叠 `.dodgeBurn` 与独立 `renderStep` 一致，容差 0**
+- [ ] **不误伤特征**：在 `20261005.jpg` 上人工标注几个痣/雀斑/胡茬位置，
+      断言它们在光影图里**接近中性**（这是唯一能自动抓住"把痣当暗斑压暗"的办法）
+- [ ] **无光晕/接缝**：沿光影图边界取剖面，见过冲或台阶
+- [ ] 既有 55 项测试全过；**`skin` 的 v1/v2 指纹不变**
+- [ ] iOS 编译通过；核心 target 无 AppKit/UIKit
+- [ ] 出**四联图**（原图 / 结果 / 差值 / 光影图），**给人看**——
+      交接里说了"验收以实际成片为主，检测数量只是辅助指标"
+- [ ] `SYNC.md` 记录实测与复现命令
+
+**明确不做**：不改 `DodgeBurnParams` 的格式（已冻结）；不做 ③ 颜色通道（T14）；
+不引入模型（除非 ② 的确定性方法被证明不够用，那要单独讨论）
 
 ---
 
