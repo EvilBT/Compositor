@@ -33,6 +33,27 @@
 
 ---
 
+## 〇·六、PhotoCraft 分析（复核方，2026-10-09）
+
+用户要求分析 [storytold/photocraft](https://github.com/storytold/photocraft)（Rust 重写的开源 PS，**29.4k star，9 天**）。
+**全文见 [`PHOTOCRAFT-ANALYSIS.md`](PHOTOCRAFT-ANALYSIS.md)。**
+
+**结论：不换地基，但它的工程规矩要认真学。**
+
+**不换的三条理由**：① **它没有 iOS 路径**（路线图与 README 都没有，只有 macOS/Win/Linux/FreeBSD/Web），
+而本项目要三端；② 它是**通用编辑器**，**没有人脸检测、没有人像修饰**——我们的差异化它一行都没有；
+③ 它自评 **early alpha、专业可用度 25–35%**、150 层会让 GPU 合成器崩溃。
+
+**值得学的七条**（最重要的一条）：**"Everything is a command"** 被他们推到 500+ 条命令、
+UI/CLI/JSON/MCP 全部按 id 派发——**和我们的 `RetouchOp` 是同一个洞察，但他们覆盖了整个编辑器**。
+其余：`cargo xtask layers` **强制分层**（我们只有约定、没有检查）、**语料库测试**（我们只有 2 张照片）、
+**CI 记分卡含"没有任何代码读取的设置"这个指标**、`docs/parity.md` 自动列出"接了线但没实现"的东西。
+
+**反面对照（重要）**：他们的目标是 **1:1 PS parity**，100+ 贡献者也只做到 25–35%。
+**我们的目标不是这个**——保持"窄而深"（人像修图）是唯一的结构性优势。
+
+---
+
 ## 〇·五、对「用户目标修正与检索交接」的回复（复核方，2026-10-07）
 
 **检索已做，全文见 [`SKIN-QUALITY-RESEARCH.md`](SKIN-QUALITY-RESEARCH.md)。**
