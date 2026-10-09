@@ -14,7 +14,7 @@
 | 最近推送 | 2026-10-09 06:24（**1.1 小时前**） | API |
 | 提交速度 | **100 个提交 / 5 小时**（含多名人类贡献者） | API |
 | 语言 / 许可 | **Rust** / Apache-2.0（站称 MIT OR Apache-2.0） | API |
-| 规模 | 22 MB，**24 个 crate** | API + 目录 |
+| 规模 | **332,366 行 Rust**，864 文件，**24 个 crate**，4,378 个测试 | 克隆后实测 |
 | 最新发布 | **v0.5.0**，23 个产物（macOS/Win/Linux/FreeBSD） | Releases |
 | 平台 | macOS · Windows · Linux · FreeBSD · **Web(WASM)** | README |
 | 自评状态 | **early alpha** | README 徽章 |
@@ -87,7 +87,7 @@ L6 ui-egui automation  ← MCP server
 | **iOS / iPad / iPhone** | ❌ **路线图和 README 都没有** | 🎯 **明确目标** |
 | **人脸检测 / 皮肤遮罩** | ❌ | ✅ Vision + FaRL/SAM3 |
 | **人像专用修饰**（磨皮、祛瑕疵、眼牙、液化） | ❌ **一个都没有** | ✅ 21 种算子 |
-| **中文界面** | ❓ 未知 | ✅ 773/774 |
+| **中文界面** | ✅ **有**（14 种语言，zh-hans 2,255 条）——更正：我上轮标了未知 | ✅ 773 条（2 种语言） |
 | 摄影修图的方法论（SKILL） | ❌ | ✅ 270 行 |
 
 ---
@@ -160,7 +160,90 @@ L6 ui-egui automation  ← MCP server
 
 ---
 
-## 八、我没有核实的
+## 八、克隆后的实测对比（2026-10-09）
+
+已克隆到 `~/Developer/photocraft`（47 MB，depth 1）。
+
+### 8.1 规模：**不是同一个量级**
+
+| | PhotoCraft | 本项目 |
+|---|---:|---:|
+| 代码 | **332,366 行 Rust** / 864 文件 / 24 crate | 40,259 行（PF 3,770 + Compositor 36,489） |
+| **测试** | **4,378 个 `#[test]`** / 139 测试文件 | 592 个（PF 60 + Compositor 532） |
+| 文档 | **70 个 md** | ~15 个 md |
+| 本地化 | **14 种语言**（zh-hans 2,255 条） | 2 种（773 条） |
+| 最大 crate | `ui-egui` **98,219 行** | PortraitFoundation 全部 3,770 行 |
+
+**它的 `ui-egui` 一个 crate 就是你们全部代码的 2.4 倍。**
+
+### 8.2 ⭐ **MCP 设计：这是最有价值的一条**
+
+**他们用「少数通用工具 + 命令注册表」，你们用「少数专用工具」。**
+
+| 它暴露的工具 | 作用 |
+|---|---|
+| `command_list` | **列出引擎所有命令：id、label、菜单路径、快捷键、参数说明、当前是否可用**（带 filter / enabled_only） |
+| `command_run` | **按 id 跑任意命令**，返回 JSON 结果；长命令可 `wait: false` 变成后台任务 |
+| `command_batch` | 一次调用跑多条命令，**减少往返** |
+| `job_list` / `job_cancel` | **后台任务的进度与取消**（进度 0–1、消息、已用时间） |
+| `doc_state` | 文档状态 JSON：**图层树、历史、选区、活动图层** |
+| `doc_render` | 渲染拼合结果，返回 PNG 图像 |
+| `doc_open` / `doc_save` / `doc_export` / `doc_new` / `doc_close` / `doc_activate` | 文档生命周期 |
+
+**这直接回答了我们 T11 的 11d。** 我们打算"加一个 `get_capabilities` 工具"，
+而他们的 `command_list` 就是那个想法的**通用形式**——**不硬编码能力清单，而是从注册表派生**，
+还附带 `enabled` 状态（现在能不能用）。
+
+**而且它解决了我们还没解决的问题**：`job_list` / `job_cancel`。
+我们的 Mac UI 有取消，**但 MCP 层没有**——而 T10 的 SAM3 分析要 **24–30 秒**，
+没有进度和取消的 MCP 工具是没法用的。
+
+**`command_batch` 也值得学**：修图的"一次一层"工作流天然是多步的，
+我们的 agent 现在只能一次次往返。
+
+### 8.3 后台任务模型（`crates/engine/src/jobs.rs`）
+
+> "Background jobs: long commands run on a worker thread, report progress and can be cancelled"
+
+命令通过 `ctx.progress(0.1, "Finding subject")` 上报进度，`JobCtx` 同时携带**取消标志**。
+
+**这正是 T10 需要的**：24–30 秒的分析必须能报进度、能取消。
+**建议把这套模型作为 T10 的前置**，而不是等接完 SAM3 才发现没法取消。
+
+### 8.4 安全模型（`crates/automation/src/security.rs`，315 行）
+
+- **256 位 bearer token**，用系统 CSPRNG 生成，**常数时间比较**
+- **有界行读取**（`MAX_REQUEST_BYTES`），超长请求正确丢弃并继续读下一行
+- 连接数上限、批量上限、读写超时、**仅回环 TCP**
+
+**我们的 MCP 是 stdio（无网络面），所以没有等价风险**——但如果将来加 HTTP 传输，
+**这份实现是现成的参照**。
+
+### 8.5 它有、而我们确实没有的（补充）
+
+| | 证据 |
+|---|---|
+| **CJK 字体回退**（Inter/JetBrains Mono 无中日韩字形，按 OS 探测回退） | `crates/ui-egui/src/cjk_fonts.rs`（有测试） |
+| **14 种语言**目录 + 语言选择器 + 系统 locale 探测 | `crates/ui-egui/src/i18n/*.tsv` + `tests/system_locale.rs` |
+| **翻译许可证说明** | `i18n/LICENSE-translations.txt`，且文档写明"中文措辞为原创，未提取专有翻译资源" |
+
+**最后一条值得注意**：他们**为翻译单独写了许可说明**，并声明是原创措辞。
+**我们做中文翻译时没有考虑这一点**——如果术语表借鉴了 Adobe 官方译法，
+在 Apache-2.0 下发布时可以更明确一些。
+
+### 8.6 更新后的结论
+
+**规模差距是数量级的**（代码 8×、测试 7.4×），所以"换地基"在人力上也不现实。
+
+**但三个具体的东西应该立刻学**：
+
+1. **`command_list` 式的能力发现**（替代我们硬编码在 instructions 里的算子清单）→ 并入 **T11**
+2. **`job_list` / `job_cancel` 的后台任务模型**（进度 + 取消）→ **提到 T10 之前做**
+3. **`command_batch`**（减少往返）→ 并入 T11
+
+---
+
+## 九、我没有核实的
 
 - **没有实际构建或运行 PhotoCraft**（22 MB 仓库，24 crate，未克隆）
 - **没有验证** "309 个测试文件重保存无损还原 307 个"这一具体数字
